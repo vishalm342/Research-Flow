@@ -1,17 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
+from app.config import settings
 from app.database import connect_to_mongo, close_mongo_connection
-from app.api import research, reports
+from app.api import research, reports, chat
 
-app = FastAPI()
+app = FastAPI(title="ResearchFlow API", version="1.0.0")
 
-frontend_url = os.getenv("FRONTEND_URL")
-if frontend_url:
-    allowed_origins = [frontend_url]
-else:
-    # No FRONTEND_URL configured: disable CORS by default
-    allowed_origins = []
+allowed_origins = [settings.FRONTEND_URL] if settings.FRONTEND_URL else ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,14 +19,18 @@ app.add_middleware(
 # Include API routers
 app.include_router(research.router)
 app.include_router(reports.router)
+app.include_router(chat.router)
+
 
 @app.get("/")
 def read_root():
     return {"message": "Welcome to ResearchFlow API"}
 
+
 @app.on_event("startup")
 async def on_startup():
     await connect_to_mongo()
+
 
 @app.on_event("shutdown")
 async def on_shutdown():

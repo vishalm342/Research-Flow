@@ -2,6 +2,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from app.config import settings
 from app.models.research import ResearchSession, Report
+from app.models.conversation import Conversation
+from app.models.message import Message
 
 # Global variables
 client = None
@@ -15,8 +17,16 @@ async def connect_to_mongo():
     client = AsyncIOMotorClient(settings.MONGODB_URL)
     database = client[settings.DATABASE_NAME]
 
-    # Initialize Beanie with document models
-    await init_beanie(database=database, document_models=[ResearchSession, Report])
+    # Initialize Beanie with all document models
+    await init_beanie(
+        database=database,
+        document_models=[
+            ResearchSession,
+            Report,
+            Conversation,
+            Message,
+        ],
+    )
 
     print(f"✅ Connected to MongoDB: {settings.DATABASE_NAME}")
 
