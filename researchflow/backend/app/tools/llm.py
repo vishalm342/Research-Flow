@@ -1,5 +1,4 @@
-import asyncio
-from groq import Groq
+from openai import AsyncOpenAI
 from app.config import settings
 from app.utils.logger import logger
 
@@ -9,47 +8,45 @@ class LLMError(Exception):
     pass
 
 
-async def call_llm(prompt: str, model: str = "llama-3.3-70b-versatile") -> str:
+_client = AsyncOpenAI(
+    api_key=settings.SAMBANOVA_API_KEY,
+    base_url="https://api.sambanova.ai/v1",
+)
+
+
+async def call_llm(prompt: str, model: str = "Meta-Llama-3.3-70B-Instruct") -> str:
     """
-    Call Groq LLM API asynchronously.
-    
+    Call SambaNova LLM API asynchronously via the OpenAI-compatible interface.
+
     Args:
         prompt: The prompt to send to the LLM
-        model: The model name to use (default: llama-3.3-70b-versatile)
-        
+        model: The model name to use (default: Meta-Llama-3.3-70B-Instruct)
+
     Returns:
         The generated text response from the LLM
-        
+
     Raises:
         LLMError: If the API call fails
     """
     try:
         logger.info(f"Calling LLM with model: {model}")
-        
-        # Create Groq client
-        client = Groq(api_key=settings.GROQ_API_KEY)
-        
-        # Call the API in a thread pool since Groq SDK is sync
-        def _call_groq():
-            completion = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=2000
-            )
-            return completion.choices[0].message.content
-        
-        # Execute in thread pool
-        response = await asyncio.to_thread(_call_groq)
-        
+
+        completion = await _client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            temperature=0.7,
+            max_tokens=2000,
+        )
+
+        response = completion.choices[0].message.content
         logger.info(f"LLM response received: {len(response)} characters")
         return response
-        
+
     except Exception as e:
         error_msg = f"Failed to call LLM API: {str(e)}"
         logger.error(error_msg)
