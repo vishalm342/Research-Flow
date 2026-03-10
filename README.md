@@ -6,7 +6,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-green.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-blue)](https://react.dev/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-orange)](https://langchain-ai.github.io/langgraph/)
-[![Groq](https://img.shields.io/badge/Powered%20By-Groq-red)](https://groq.com/)
+[![Groq](https://img.shields.io/badge/Powered%20By-SambaNova-red)](https://sambanova.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 **ResearchFlow** is an autonomous AI programming agent system designed to conduct in-depth internet research and generate high-quality, comprehensive reports. By orchestrating a team of specialized AI agents—a **Researcher**, a **Writer**, and an **Editor**—ResearchFlow transforms a single user prompt into a polished, citation-backed document, turning hours of manual work into a seamless automated workflow.
