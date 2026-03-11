@@ -1,18 +1,16 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './pages/Home';
-import Research from './pages/Research';
-import Report from './pages/Report';
+import WorkspaceLayout from './layouts/WorkspaceLayout';
+import ChatWorkspace from './pages/ChatWorkspace';
 
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <WorkspaceLayout>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/research/:id" element={<Research />} />
-          <Route path="/report/:id" element={<Report />} />
+          <Route path="/" element={<ChatWorkspace />} />
+          <Route path="/c/:conversationId" element={<ChatWorkspace />} />
         </Routes>
-      </div>
+      </WorkspaceLayout>
     </Router>
   );
 }
