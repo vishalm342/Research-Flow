@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Terminal } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Terminal,
+  Search,
+  PenLine,
+  CheckCircle2,
+  Wand2,
+} from 'lucide-react';
 import { getResearchStatus } from '../api/research';
 
 const AGENT_EMOJIS = {
@@ -106,14 +114,13 @@ const TerminalLog = ({ sessionId, onComplete }) => {
 
   return (
     <div className="flex flex-col gap-3 mt-2">
-      {/* Sleek Accordion Button */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="
-          flex items-center gap-3 text-sm text-indigo-400
-          bg-indigo-500/10 border border-indigo-500/20
+          flex items-center gap-3 text-sm text-zinc-400
+          bg-zinc-900 border border-zinc-800
           px-4 py-3 rounded-xl cursor-pointer
-          hover:bg-indigo-500/20 transition-all w-fit shadow-sm
+          hover:bg-zinc-800/80 transition-all w-fit shadow-sm
         "
       >
         <Terminal size={16} />
@@ -127,31 +134,122 @@ const TerminalLog = ({ sessionId, onComplete }) => {
             {status.progress}%
           </span>
         )}
-        <div className="ml-2 text-indigo-400/70">
+        <div className="ml-2 text-zinc-500">
           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </button>
 
-      {/* Terminal Window */}
       {isExpanded && (
         <div
           ref={terminalRef}
           className="
-            bg-black border border-slate-700/80 rounded-xl
-            text-green-400 text-xs font-mono p-4 h-60
-            overflow-y-auto scrollbar-thin shadow-2xl w-full max-w-3xl
+            bg-zinc-950 border border-zinc-800 rounded-xl
+            p-3 md:p-4 overflow-y-auto shadow-2xl w-full max-w-3xl
+            space-y-2
           "
         >
-          {logs.length === 0 ? (
-            <p className="text-green-500/50">Waiting for logs...</p>
-          ) : (
-            logs.map((log, idx) => (
-              <div key={idx} className="mb-1 leading-relaxed">
-                <span className="text-green-500/70">{'> '}</span>
-                {log}
+          {[
+            {
+              key: 'researcher',
+              name: 'Researcher',
+              Icon: Search,
+              active: status?.current_agent === 'researcher',
+              done: status?.status === 'researcher_complete'
+                || status?.current_agent === 'writer'
+                || status?.current_agent === 'editor'
+                || status?.current_agent === 'refiner'
+                || status?.status === 'complete',
+              activeText: 'Searching the web...',
+            },
+            {
+              key: 'writer',
+              name: 'Writer',
+              Icon: PenLine,
+              active: status?.current_agent === 'writer',
+              done: status?.status === 'writer_complete'
+                || status?.current_agent === 'editor'
+                || status?.current_agent === 'refiner'
+                || status?.status === 'complete',
+              activeText: 'Writing draft...',
+            },
+            {
+              key: 'editor',
+              name: 'Editor',
+              Icon: CheckCircle2,
+              active: status?.current_agent === 'editor',
+              done: status?.current_agent === 'refiner' || status?.status === 'complete',
+              activeText: 'Reviewing draft...',
+            },
+            {
+              key: 'refiner',
+              name: 'Refiner',
+              Icon: Wand2,
+              active: status?.current_agent === 'refiner',
+              done: status?.status === 'complete',
+              activeText: 'Applying refinements...',
+            },
+          ].map((agent) => {
+            const rowState = agent.active ? 'active' : agent.done ? 'done' : 'pending';
+            const rowClasses = rowState === 'active'
+              ? 'bg-emerald-500/10 border border-emerald-500/30 rounded-xl'
+              : rowState === 'done'
+                ? 'bg-zinc-900 border border-zinc-800 rounded-xl'
+                : 'bg-zinc-950 border border-zinc-800/50 rounded-xl';
+
+            const iconClasses = rowState === 'active'
+              ? 'text-emerald-400'
+              : rowState === 'done'
+                ? 'text-zinc-400'
+                : 'text-zinc-600';
+
+            const titleClasses = rowState === 'active'
+              ? 'text-zinc-100'
+              : rowState === 'done'
+                ? 'text-zinc-200'
+                : 'text-zinc-500';
+
+            const statusClasses = rowState === 'active'
+              ? 'text-emerald-300'
+              : rowState === 'done'
+                ? 'text-zinc-500'
+                : 'text-zinc-600';
+
+            const statusText = rowState === 'active'
+              ? agent.activeText
+              : rowState === 'done'
+                ? 'Complete'
+                : 'Waiting...';
+
+            return (
+              <div key={agent.key} className={`p-3 ${rowClasses}`}>
+                <div className="flex items-center gap-3">
+                  <div className="relative shrink-0">
+                    <div className="h-9 w-9 rounded-lg border border-zinc-800 bg-zinc-900/70 flex items-center justify-center">
+                      <agent.Icon size={16} className={iconClasses} />
+                    </div>
+                    {rowState === 'done' && (
+                      <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-zinc-800 border border-zinc-700 text-[10px] text-zinc-300 flex items-center justify-center">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-semibold ${titleClasses}`}>{agent.name}</p>
+                    <p className={`text-xs mt-0.5 ${statusClasses}`}>{statusText}</p>
+                  </div>
+
+                  <div className="w-24 shrink-0">
+                    {rowState === 'active' && (
+                      <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                        <div className="h-full w-2/3 bg-emerald-500 animate-pulse rounded-full" />
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
       )}
     </div>
