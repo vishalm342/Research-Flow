@@ -17,4 +17,7 @@ export default {
   plugins: [
     require('@tailwindcss/typography'),
   ],
+  fontFamily: {
+  sans: ['Satoshi', 'Inter', 'system-ui', 'sans-serif'],
+}
 }
