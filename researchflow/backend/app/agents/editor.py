@@ -48,8 +48,16 @@ async def editor_node(state: AgentState) -> AgentState:
 {draft_report}
 
 Improve the structure, fix any grammatical errors, enhance readability, and ensure all sections flow logically. Maintain all citations and sources."""
+        
 
         final_report = await call_llm(polish_prompt)
+        import re as _re
+        _wc = len(final_report.split())
+        _sc = min(len(state.get("search_results", [])), 3) if "sources" not in locals() else min(len(sources), 3)
+        _hc = 1.0 if "##" in final_report else 0.0
+        _cc = 1.0 if len(_re.findall(r'https?://', final_report)) >= 3 else 0.0
+        _lc = 2.0 if _wc >= 2000 else (1.5 if _wc >= 1000 else 1.0)
+        quality_score = round(min(_lc + _sc + _hc + _cc, 10.0), 1)
         logger.info(f"Final report generated: {len(final_report)} characters")
 
         report_id = str(uuid.uuid4())
@@ -62,6 +70,7 @@ Improve the structure, fix any grammatical errors, enhance readability, and ensu
             content=final_report,
             sources=sources,
             word_count=len(final_report.split()),
+            quality_score=quality_score,
             created_at=datetime.now(timezone.utc),
         )
         await report.insert()
@@ -73,6 +82,7 @@ Improve the structure, fix any grammatical errors, enhance readability, and ensu
             session.progress = 100
             session.current_agent = "editor"
             session.report_id = report_id
+            session.quality_score = quality_score
             await session.save()
 
         state["final_report"] = final_report
