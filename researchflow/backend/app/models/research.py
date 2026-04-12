@@ -15,6 +15,7 @@ class ResearchSession(Document):
     report_id: Optional[str] = Field(default=None, description="Generated report ID")
     error_message: Optional[str] = Field(default=None, description="Error message if failed")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    quality_score: Optional[float] = None
 
     class Settings:
         name = "research_sessions"
@@ -28,6 +29,7 @@ class Report(Document):
     sources: List[dict] = Field(default_factory=list, description="List of sources used")
     word_count: int = Field(..., description="Word count of the report")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    quality_score: Optional[float] = None
 
     class Settings:
         name = "reports"
