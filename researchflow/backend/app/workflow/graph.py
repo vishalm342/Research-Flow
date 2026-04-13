@@ -141,6 +141,7 @@ async def run_research_workflow(
                 Conversation.conversation_id == conversation_id
             )
             if conversation:
+                fresh_session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
                 report_message = Message(
                     message_id=str(uuid.uuid4()),
                     conversation_id=conversation_id,
@@ -150,7 +151,8 @@ async def run_research_workflow(
                     metadata={
                         "type": "research_report",
                         "research_id": session_id,
-                        "report_id": getattr(session, "report_id", None),
+                        "report_id": fresh_session.report_id if fresh_session else None,
+                        "quality_score": fresh_session.quality_score if fresh_session else None,
                         "topic": topic,
                     },
                 )
