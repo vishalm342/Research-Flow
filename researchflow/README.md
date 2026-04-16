@@ -1,13 +1,14 @@
 # ResearchFlow 🧠🌊
 
-> **Deep Research. Automated.**
+> Multi-agent AI research pipeline built with LangGraph, FastAPI, and React
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-green.svg)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-18-blue)](https://react.dev/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-orange)](https://langchain-ai.github.io/langgraph/)
-[![Groq](https://img.shields.io/badge/Powered%20By-Groq-red)](https://groq.com/)
-[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-FF9900?style=for-the-badge)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
 
 **ResearchFlow** is an autonomous AI programming agent system designed to conduct in-depth internet research and generate high-quality, comprehensive reports. By orchestrating a team of specialized AI agents—a **Researcher**, a **Writer**, and an **Editor**—ResearchFlow transforms a single user prompt into a polished, citation-backed document, turning hours of manual work into a seamless automated workflow.
 
@@ -38,15 +39,18 @@ In the era of information overload, finding accurately sourced summaries is diff
 
 ## 🏗️ Architecture
 
-ResearchFlow treats the research process as a state machine via LangGraph:
+```text
+User Query → [Researcher Agent] → [Writer Agent] → [Editor Agent] → [Refiner Agent] → Final Report
+                   ↓                    ↓                  ↓                 ↓
+            Web Search API        Draft Report       Quality Check      Score + Polish
+```
 
-1.  **User Input:** Topic is received via the Frontend.
-2.  **Research Phase:** The **Researcher** generates search queries, fetches content using Tavily/DuckDuckGo, and summarizes findings.
-3.  **Drafting Phase:** The **Writer** takes the research data and produces a first draft.
-4.  **Review Phase:** The **Editor** critiques the draft.
-    *   *If valid:* The workflow ends.
-    *   *If invalid:* The Editor provides feedback, and control loops back to the **Writer**.
-5.  **Delivery:** The final report is streamed to the user.
+## ⚙️ How It Works
+
+1. **Researcher Agent**: Intelligently queries search engines, scrapes top results, and extracts key facts relevant to the user's topic.
+2. **Writer Agent**: Synthesizes the scattered data gathered by the researcher into a structured, readable first draft.
+3. **Editor Agent**: Reviews and critiques the draft for clarity, accuracy, and flow, rejecting sub-par work and requesting revisions automatically.
+4. **Refiner Agent**: Applies final polish and assigns a quality score, ensuring the text is fully refined and ready for export.
 
 ---
 
@@ -78,62 +82,23 @@ ResearchFlow treats the research process as a state machine via LangGraph:
 
 ### Installation (Docker - Recommended)
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/yourusername/Research-Flow.git
-    cd Research-Flow
-    ```
-
-2.  **Configure Environment Variables:**
-    Create a `.env` file in `backend/` and `frontend/`:
-    
-    `backend/.env`:
-    ```env
-    GROQ_API_KEY=gsk_...
-    TAVILY_API_KEY=tvly-...
-    MONGODB_URL=mongodb://mongodb:27017
-    ```
-
-3.  **Run with Docker Compose:**
-    ```bash
-    docker-compose up --build
-    ```
-
-4.  **Access the App:**
-    *   Frontend: `http://localhost:5173`
-    *   Backend Docs: `http://localhost:8000/docs`
-
-### Manual Installation
-
-<details>
-<summary>Click to view manual setup instructions</summary>
-
-#### Backend
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/Research-Flow.git
+cd Research-Flow
+
+# 1. Install and Run Backend
 cd backend
 python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
-```
 
-#### Frontend
-```bash
-cd frontend
+# 2. Install and Run Frontend (in a new terminal)
+cd ../frontend
 npm install
 npm run dev
-```
-
-</details>
-
----
-
-## 💡 Usage
-
-1.  Open the dashboard at `http://localhost:5173`.
-2.  Click **"Start New Research"**.
-3.  Enter a research topic (e.g., *"The impact of Quantum Computing on Cybersecurity in 2025"*).
-4.  Watch the agents work in real-time:
+```the agents work in real-time:
     *   See the **Researcher** finding sources.
     *   Watch the **Writer** drafting.
     *   Wait for the **Editor's** seal of approval.
