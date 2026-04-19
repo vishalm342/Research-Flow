@@ -9,6 +9,9 @@ from app.utils.logger import logger
 async def editor_node(state: AgentState) -> AgentState:
     """
     Editor agent node - reviews and polishes the draft report.
+    
+    Note: Status updates are now handled by the workflow orchestration layer
+    to ensure strict sequential ordering of status events.
     """
     try:
         session_id = state["session_id"]
@@ -16,13 +19,6 @@ async def editor_node(state: AgentState) -> AgentState:
         topic = state["topic"]
 
         logger.info(f"Editor node started for session {session_id}")
-
-        session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
-        if session:
-            session.status = "editor_running"
-            session.progress = 70
-            session.current_agent = "editor"
-            await session.save()
 
         word_count = len(draft_report.split())
         logger.info(f"Draft report word count: {word_count}")
@@ -32,12 +28,6 @@ async def editor_node(state: AgentState) -> AgentState:
 
             state["retry_count"] += 1
             state["current_step"] = "needs_rewrite"
-
-            if session:
-                session.status = "writer_running"
-                session.progress = 50
-                session.current_agent = "editor"
-                await session.save()
 
             return state
 
@@ -77,10 +67,9 @@ Improve the structure, fix any grammatical errors, enhance readability, and ensu
 
         logger.info(f"Report saved to database with ID: {report_id}")
 
+        # Update session with final report info (but NOT status - that's handled by orchestration)
+        session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
         if session:
-            session.status = "complete"
-            session.progress = 100
-            session.current_agent = "editor"
             session.report_id = report_id
             session.quality_score = quality_score
             await session.save()
