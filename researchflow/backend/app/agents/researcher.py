@@ -10,6 +10,9 @@ async def researcher_node(state: AgentState) -> AgentState:
     """
     Researcher agent node - searches the web and scrapes relevant content.
     
+    Note: Status updates are now handled by the workflow orchestration layer
+    to ensure strict sequential ordering of status events.
+    
     Args:
         state: Current AgentState with topic and session_id
         
@@ -22,17 +25,24 @@ async def researcher_node(state: AgentState) -> AgentState:
         
         logger.info(f"Researcher node started for session {session_id}, topic: {topic}")
         
-        # Update MongoDB session status to indicate researcher is running
-        session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
-        if session:
-            session.status = "researcher_running"
-            session.progress = 10
-            session.current_agent = "researcher"
-            await session.save()
-        
-        # Search the web for the topic
+        # Run TWO search queries: original + latest developments
         logger.info(f"Searching web for: {topic}")
-        search_results = await search_web(topic, max_results=8)
+        search_results_1 = await search_web(topic, max_results=8)
+        
+        logger.info(f"Searching web for: {topic} latest developments 2024 2025")
+        search_results_2 = await search_web(f"{topic} latest developments 2024 2025", max_results=8)
+        
+        # Combine and deduplicate results by URL
+        seen_urls = set()
+        combined_results = []
+        
+        for result in search_results_1 + search_results_2:
+            url = result.get("url")
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                combined_results.append(result)
+        
+        search_results = combined_results
         
         if not search_results:
             logger.warning(f"No search results found for topic: {topic}")
@@ -41,10 +51,10 @@ async def researcher_node(state: AgentState) -> AgentState:
             state["current_step"] = "researcher_complete"
             return state
         
-        logger.info(f"Found {len(search_results)} search results")
+        logger.info(f"Found {len(search_results)} deduplicated search results")
         
-        # Get top 5 URLs to scrape
-        urls = [r["url"] for r in search_results[:5]]
+        # Get top 7 URLs to scrape
+        urls = [r["url"] for r in search_results[:7]]
         logger.info(f"Scraping {len(urls)} URLs")
         
         # Scrape each URL concurrently
@@ -56,13 +66,6 @@ async def researcher_node(state: AgentState) -> AgentState:
         # Filter successful scrapes
         scraped_content = [s for s in scraped if s.get("success")]
         logger.info(f"Successfully scraped {len(scraped_content)} out of {len(urls)} URLs")
-        
-        # Update MongoDB session with progress
-        if session:
-            session.status = "researcher_complete"
-            session.progress = 33
-            session.current_agent = "researcher"
-            await session.save()
         
         # Update state
         state["search_results"] = search_results
