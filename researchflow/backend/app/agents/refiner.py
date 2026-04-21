@@ -8,6 +8,9 @@ async def refiner_node(state: AgentState) -> AgentState:
     """
     Refiner agent node – rewrites the final report to focus on a user-supplied
     refinement query.
+    
+    Note: Status updates are now handled by the workflow orchestration layer
+    to ensure strict sequential ordering of status events.
 
     Expects
     -------
@@ -27,16 +30,6 @@ async def refiner_node(state: AgentState) -> AgentState:
             f"Refiner node started for session {session_id} "
             f"– refinement query: {refinement_query!r}"
         )
-
-        # Update session status in MongoDB
-        session = await ResearchSession.find_one(
-            ResearchSession.session_id == session_id
-        )
-        if session:
-            session.status = "refiner_running"
-            session.progress = 90
-            session.current_agent = "refiner"
-            await session.save()
 
         if not final_report:
             logger.warning("Refiner received an empty report – skipping refinement.")
@@ -68,13 +61,6 @@ Return ONLY the refined report in Markdown format."""
         logger.info("Calling LLM for report refinement")
         refined_report = await call_llm(prompt)
         logger.info(f"Refined report generated: {len(refined_report)} characters")
-
-        # Persist status update
-        if session:
-            session.status = "complete"
-            session.progress = 100
-            session.current_agent = "refiner"
-            await session.save()
 
         state["final_report"] = refined_report
         state["current_step"] = "complete"
