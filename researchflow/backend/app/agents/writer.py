@@ -7,6 +7,9 @@ from app.utils.logger import logger
 async def writer_node(state: AgentState) -> AgentState:
     """
     Writer agent node - generates a comprehensive research report from scraped content.
+    
+    Note: Status updates are now handled by the workflow orchestration layer
+    to ensure strict sequential ordering of status events.
     """
     try:
         session_id = state["session_id"]
@@ -14,13 +17,6 @@ async def writer_node(state: AgentState) -> AgentState:
         scraped_content = state["scraped_content"]
 
         logger.info(f"Writer node started for session {session_id}, topic: {topic}")
-
-        session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
-        if session:
-            session.status = "writer_running"
-            session.progress = 40
-            session.current_agent = "writer"
-            await session.save()
 
         if not scraped_content:
             logger.warning(f"No scraped content available for topic: {topic}")
@@ -36,34 +32,36 @@ async def writer_node(state: AgentState) -> AgentState:
 
         logger.info(f"Built context from {len(scraped_content)} sources, {len(context)} characters")
 
-        prompt = f"""You are a research analyst. Write a comprehensive research report on '{topic}'. Use the following sources:
+        prompt = f"""You are a research analyst. Write a comprehensive report of minimum 1200 words on '{topic}'. Use the following sources:
 
 {context}
 
-Format the report in markdown with:
+Format the report in markdown with the following required sections:
 
 # {topic}
 
 ## Introduction
 
+## Background
+
 ## Key Findings
-(5-7 bullet points with insights)
+(at least 5 distinct findings with detailed explanations)
 
 ## Detailed Analysis
 
+## Implications
+
 ## Conclusion
 
-Cite sources naturally in text using the source URLs provided."""
+IMPORTANT INSTRUCTIONS:
+- Write a comprehensive report of minimum 1200 words
+- Include an Introduction, Background, Key Findings (at least 5 distinct findings), Detailed Analysis, Implications, and Conclusion section
+- Do not truncate or summarize — write in full depth for each section
+- Cite sources naturally in text using the source URLs provided"""
 
         logger.info("Calling LLM to generate draft report")
         response = await call_llm(prompt)
         logger.info(f"Draft report generated: {len(response)} characters")
-
-        if session:
-            session.status = "writer_complete"
-            session.progress = 66
-            session.current_agent = "writer"
-            await session.save()
 
         state["draft_report"] = response
         state["current_step"] = "writer_complete"
