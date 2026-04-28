@@ -12,6 +12,15 @@ export default {
         accent:    '#6366f1',
         panel:     '#334155',
       },
+      keyframes: {
+        fadeIn: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+      },
+      animation: {
+        fadeIn: 'fadeIn 500ms ease-in-out',
+      },
     },
   },
   plugins: [
