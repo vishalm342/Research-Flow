@@ -42,12 +42,11 @@ const ChatInput = ({ value, onChange, onSubmit, disabled }) => {
           disabled={disabled}
           rows={1}
           className="
-            w-full bg-slate-800/80 backdrop-blur-md
-            border border-slate-600/50 focus:border-indigo-500/60
-            text-white placeholder-slate-500 text-sm leading-relaxed
-            rounded-2xl p-4 pr-28
-            focus:outline-none focus:ring-2 focus:ring-indigo-500/30
-            shadow-xl resize-none
+            w-full bg-zinc-900 border border-zinc-700 focus:border-emerald-500/60
+            text-white placeholder-zinc-500 text-sm leading-relaxed
+            rounded-xl p-4 pr-28
+            focus:outline-none focus:ring-2 focus:ring-emerald-500/20
+            resize-none
             max-h-40 overflow-y-auto scrollbar-thin
             disabled:opacity-50 disabled:cursor-not-allowed
             transition-all duration-200
@@ -63,13 +62,13 @@ const ChatInput = ({ value, onChange, onSubmit, disabled }) => {
             title={isResearchEnabled ? "Research mode enabled (click to disable)" : "Research mode disabled (click to enable)"}
             className={`
               flex items-center gap-1.5
-              px-3 py-1.5 rounded-xl
+              px-3 py-1.5 rounded-md
               border text-xs font-medium
               disabled:opacity-40 disabled:cursor-not-allowed
-              transition-all duration-150 shadow-md
+              transition-all duration-150
               ${isResearchEnabled
-                ? 'bg-indigo-600 hover:bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/30'
-                : 'bg-slate-700/80 hover:bg-slate-600 border-slate-600/50 hover:border-slate-500 text-slate-400 hover:text-slate-300'
+                ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-500 text-white'
+                : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-500 hover:text-zinc-300'
               }
             `}
           >
@@ -83,12 +82,12 @@ const ChatInput = ({ value, onChange, onSubmit, disabled }) => {
             disabled={disabled || !value.trim()}
             title="Send message (Enter)"
             className="
-              p-2 rounded-xl
-              bg-slate-700 hover:bg-slate-600
-              border border-slate-600/50 hover:border-slate-500
-              text-slate-300 hover:text-white
+              p-2 rounded-md
+              bg-zinc-800 hover:bg-zinc-700
+              border border-zinc-700
+              text-zinc-300 hover:text-white
               disabled:opacity-40 disabled:cursor-not-allowed
-              transition-all duration-150 shadow-md
+              transition-all duration-150
             "
           >
             <ArrowUp size={16} />
@@ -96,12 +95,12 @@ const ChatInput = ({ value, onChange, onSubmit, disabled }) => {
         </div>
       </div>
 
-      <p className="text-[11px] text-slate-600 mt-2 text-center">
-        <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-500">Enter</kbd>
+      <p className="text-[11px] text-zinc-500 mt-2 text-center">
+        <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400">Enter</kbd>
         {' '}to send ·{' '}
-        <kbd className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-500">Shift+Enter</kbd>
+        <kbd className="px-1.5 py-0.5 bg-zinc-800 border border-zinc-700 rounded text-zinc-400">Shift+Enter</kbd>
         {' '}for new line ·{' '}
-        <span className={isResearchEnabled ? "text-indigo-400 font-semibold" : "text-slate-600"}>
+        <span className={isResearchEnabled ? "text-emerald-400 font-semibold" : "text-zinc-600"}>
           ✦ Research mode {isResearchEnabled ? 'ON' : 'OFF'}
         </span>
       </p>
