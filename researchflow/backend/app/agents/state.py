@@ -17,5 +17,18 @@ class AgentState(TypedDict):
     current_step: str
     retry_count: int
     error: Optional[str]
+    refinement_query: Optional[str]
+    draft_quality_score: Optional[float]
+    critic_decision: Optional[str]
+    critic_feedback: Optional[str]
+    router_decision: Optional[str]
+    search_results_primary: List[dict]
+    search_results_secondary: List[dict]
+    scraped_content_primary: List[dict]
+    scraped_content_secondary: List[dict]
+    research_errors: List[str]
+    messages: List[dict]
+    memory_enabled: bool
+    memory: List[dict]
 
     

@@ -1,6 +1,7 @@
 """
 LangGraph research workflow:
-  researcher → writer → editor → (refiner?) → END
+  researcher_primary + researcher_trends → research_merge → writer → critic
+  → editor → supervisor → (refiner?) → END
 
 After the graph finishes, if a conversation_id was supplied the final report is
 posted back as an assistant Message so the chat UI can display it.
@@ -12,24 +13,39 @@ from typing import Optional
 from langgraph.graph import StateGraph, END, START
 
 from app.agents.state import AgentState
-from app.agents.researcher import researcher_node
+from app.agents.researcher import (
+    researcher_primary_node,
+    researcher_trends_node,
+    research_merge_node,
+)
 from app.agents.writer import writer_node
+from app.agents.critic import critic_node
 from app.agents.editor import editor_node
+from app.agents.supervisor import supervisor_node
 from app.agents.refiner import refiner_node
 from app.models.research import ResearchSession
 from app.utils.logger import logger
+from app.agents.context import load_memory_entries
 
 
 # ---------------------------------------------------------------------------
 # Conditional routing helpers
 # ---------------------------------------------------------------------------
 
-def _route_after_editor(state: AgentState) -> str:
-    """Send to refiner if a refinement_query exists, else go to END."""
-    if state.get("refinement_query"):
-        return "refiner"
-    if state.get("current_step") == "needs_rewrite":
+def _route_after_critic(state: AgentState) -> str:
+    """Send back to writer if critic requests rewrite and retries remain."""
+    if state.get("critic_decision") == "rewrite" and state.get("retry_count", 0) <= 2:
         return "writer"
+    return "editor"
+
+
+def _route_after_supervisor(state: AgentState) -> str:
+    """Supervisor decides between writer, refiner, or END."""
+    decision = state.get("router_decision", "end")
+    if decision == "writer":
+        return "writer"
+    if decision == "refiner" and state.get("refinement_query"):
+        return "refiner"
     return END
 
 
@@ -44,17 +60,33 @@ def _route_after_refiner(state: AgentState) -> str:
 def _build_graph():
     builder = StateGraph(AgentState)
 
-    builder.add_node("researcher", researcher_node)
+    builder.add_node("researcher_primary", researcher_primary_node)
+    builder.add_node("researcher_trends", researcher_trends_node)
+    builder.add_node("research_merge", research_merge_node)
     builder.add_node("writer", writer_node)
+    builder.add_node("critic", critic_node)
     builder.add_node("editor", editor_node)
+    builder.add_node("supervisor", supervisor_node)
     builder.add_node("refiner", refiner_node)
 
-    builder.add_edge(START, "researcher")
-    builder.add_edge("researcher", "writer")
-    builder.add_edge("writer", "editor")
+    builder.add_edge(START, "researcher_primary")
+    builder.add_edge(START, "researcher_trends")
+    builder.add_edge("researcher_primary", "research_merge")
+    builder.add_edge("researcher_trends", "research_merge")
+    builder.add_edge("research_merge", "writer")
+    builder.add_edge("writer", "critic")
     builder.add_conditional_edges(
-        "editor",
-        _route_after_editor,
+        "critic",
+        _route_after_critic,
+        {
+            "writer": "writer",
+            "editor": "editor",
+        },
+    )
+    builder.add_edge("editor", "supervisor")
+    builder.add_conditional_edges(
+        "supervisor",
+        _route_after_supervisor,
         {
             "writer": "writer",
             "refiner": "refiner",
@@ -185,6 +217,9 @@ async def run_research_workflow(
 
         topic = session.topic
         depth = getattr(session, "depth", "medium")
+        refinement_query = getattr(session, "refinement_query", None)
+        memory_enabled = getattr(session, "memory_enabled", False)
+        memory_entries = await load_memory_entries(session_id) if memory_enabled else []
 
         initial_state: AgentState = {
             "session_id": session_id,
@@ -198,7 +233,19 @@ async def run_research_workflow(
             "current_step": "start",
             "retry_count": 0,
             "error": None,
-            # refinement_query is not set here; it can be injected later
+            "refinement_query": refinement_query,
+            "draft_quality_score": None,
+            "critic_decision": None,
+            "critic_feedback": None,
+            "router_decision": None,
+            "search_results_primary": [],
+            "search_results_secondary": [],
+            "scraped_content_primary": [],
+            "scraped_content_secondary": [],
+            "research_errors": [],
+            "messages": [],
+            "memory_enabled": memory_enabled,
+            "memory": memory_entries,
         }
 
         logger.info(f"[{session_id}] Starting research workflow — topic: {topic!r}")

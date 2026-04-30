@@ -6,6 +6,8 @@ from datetime import datetime
 class ResearchRequest(BaseModel):
     topic: str
     depth: str = "medium"
+    refinement_query: Optional[str] = None
+    enable_memory: bool = False
 
 
 class ResearchResponse(BaseModel):

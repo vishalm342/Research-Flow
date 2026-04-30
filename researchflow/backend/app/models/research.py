@@ -14,6 +14,8 @@ class ResearchSession(Document):
     current_agent: Optional[str] = Field(default=None, description="Currently active agent")
     report_id: Optional[str] = Field(default=None, description="Generated report ID")
     error_message: Optional[str] = Field(default=None, description="Error message if failed")
+    refinement_query: Optional[str] = Field(default=None, description="Optional refinement focus")
+    memory_enabled: bool = Field(default=False, description="Enable long-term memory storage")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     quality_score: Optional[float] = None
 

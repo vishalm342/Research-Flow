@@ -38,7 +38,9 @@ async def create_research(
             status="pending",
             progress=0,
             current_agent=None,
-            error_message=None
+            error_message=None,
+            refinement_query=request.refinement_query,
+            memory_enabled=request.enable_memory,
         )
         await session.insert()
         

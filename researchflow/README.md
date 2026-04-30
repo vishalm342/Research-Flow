@@ -10,7 +10,7 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
 
-**ResearchFlow** is an autonomous AI programming agent system designed to conduct in-depth internet research and generate high-quality, comprehensive reports. By orchestrating a team of specialized AI agents—a **Researcher**, a **Writer**, and an **Editor**—ResearchFlow transforms a single user prompt into a polished, citation-backed document, turning hours of manual work into a seamless automated workflow.
+**ResearchFlow** is a LangGraph-based multi-step research pipeline with conditional routing. By orchestrating a team of specialized steps—a **Researcher**, **Writer**, **Critic**, **Editor**, and optional **Refiner**—ResearchFlow transforms a single user prompt into a polished, citation-backed document, turning hours of manual work into a seamless automated workflow.
 
 ---
 
@@ -40,17 +40,45 @@ In the era of information overload, finding accurately sourced summaries is diff
 ## 🏗️ Architecture
 
 ```text
-User Query → [Researcher Agent] → [Writer Agent] → [Editor Agent] → [Refiner Agent] → Final Report
-                   ↓                    ↓                  ↓                 ↓
-            Web Search API        Draft Report       Quality Check      Score + Polish
+User Query → [Parallel Researchers] → [Writer] → [Critic] → [Editor] → [Supervisor] → [Refiner] → Final Report
+                   ↓                        ↓            ↓            ↓           ↓
+            Web Search APIs           Draft Report    Rewrite Gate   Polish     Route Decision
 ```
 
 ## ⚙️ How It Works
 
-1. **Researcher Agent**: Intelligently queries search engines, scrapes top results, and extracts key facts relevant to the user's topic.
-2. **Writer Agent**: Synthesizes the scattered data gathered by the researcher into a structured, readable first draft.
-3. **Editor Agent**: Reviews and critiques the draft for clarity, accuracy, and flow, rejecting sub-par work and requesting revisions automatically.
-4. **Refiner Agent**: Applies final polish and assigns a quality score, ensuring the text is fully refined and ready for export.
+1. **Researcher Agents**: Run in parallel to fetch primary sources and recent developments, then merge and deduplicate results.
+2. **Writer Agent**: Synthesizes the research data into a structured, readable first draft.
+3. **Critic Agent**: Scores draft quality and determines if rewrites are required.
+4. **Editor Agent**: Polishes the accepted draft for clarity and flow.
+5. **Supervisor Agent**: Routes to the refiner or ends the workflow based on user intent.
+6. **Refiner Agent**: Applies final polish and refocuses the report when a refinement query is provided.
+
+---
+
+## 🧭 Multi-Agent Orchestration Roadmap
+
+*   **LLM Supervisor Routing:** An LLM-driven router chooses between **writer**, **refiner**, or **end** based on state and user intent.
+*   **Parallel Research Fan-Out:** Two research branches run in parallel and merge into a single, deduplicated source set.
+*   **Critic Gate:** A critic node scores draft quality and decides whether rewrites are needed.
+*   **Agent Message History:** Each agent appends structured notes so downstream agents can reference prior outputs.
+*   **Opt-In Memory:** Short-term memory lives in workflow state while long-term memory persists to MongoDB.
+
+```mermaid
+graph TD
+    A[START] --> B1[researcher_primary]
+    A --> B2[researcher_trends]
+    B1 --> C[research_merge]
+    B2 --> C
+    C --> D[writer]
+    D --> E[critic]
+    E -->|rewrite| D
+    E -->|accept| F[editor]
+    F --> G[supervisor]
+    G -->|refine| H[refiner]
+    G -->|end| I[END]
+    H --> I
+```
 
 ---
 
