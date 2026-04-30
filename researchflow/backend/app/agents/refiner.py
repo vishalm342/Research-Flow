@@ -1,4 +1,5 @@
 from app.agents.state import AgentState
+from app.agents.context import add_agent_message, append_memory_entry, format_memory_context
 from app.tools.llm import call_llm
 from app.models.research import ResearchSession
 from app.utils.logger import logger
@@ -41,6 +42,9 @@ async def refiner_node(state: AgentState) -> AgentState:
             state["current_step"] = "complete"
             return state
 
+        memory_notes = format_memory_context(state)
+        memory_block = f"\n\nMemory:\n{memory_notes}" if memory_notes else ""
+
         prompt = f"""You are an expert research editor performing a targeted refinement.
 
 The user wants you to focus the following research report specifically on:
@@ -56,6 +60,8 @@ Instructions:
 - Maintain the same Markdown formatting.
 - Preserve depth and accuracy – do not sacrifice quality for brevity.
 
+{memory_block}
+
 Return ONLY the refined report in Markdown format."""
 
         logger.info("Calling LLM for report refinement")
@@ -65,6 +71,19 @@ Return ONLY the refined report in Markdown format."""
         state["final_report"] = refined_report
         state["current_step"] = "complete"
         state["error"] = None
+
+        add_agent_message(
+            state,
+            "refiner",
+            f"Refined report with {len(refined_report.split())} words.",
+            {"refinement_query": refinement_query},
+        )
+        await append_memory_entry(
+            state,
+            "refiner",
+            f"Refined report with {len(refined_report.split())} words.",
+            {"refinement_query": refinement_query},
+        )
 
         logger.info(f"Refiner node completed for session {session_id}")
         return state

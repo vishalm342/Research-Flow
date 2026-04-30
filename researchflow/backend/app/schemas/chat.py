@@ -23,6 +23,7 @@ class MessageRequest(BaseModel):
     content: str
     trigger_research: bool = False
     refinement_query: Optional[str] = None
+    enable_memory: bool = False
 
 
 class MessageResponse(BaseModel):

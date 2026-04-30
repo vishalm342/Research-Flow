@@ -1,4 +1,10 @@
 from app.agents.state import AgentState
+from app.agents.context import (
+    add_agent_message,
+    append_memory_entry,
+    format_agent_messages,
+    format_memory_context,
+)
 from app.tools.llm import call_llm
 from app.models.research import ResearchSession
 from app.utils.logger import logger
@@ -32,9 +38,18 @@ async def writer_node(state: AgentState) -> AgentState:
 
         logger.info(f"Built context from {len(scraped_content)} sources, {len(context)} characters")
 
+        agent_notes = format_agent_messages(state)
+        memory_notes = format_memory_context(state)
+        notes_block = ""
+        if agent_notes:
+            notes_block += f"\n\nAgent Notes:\n{agent_notes}"
+        if memory_notes:
+            notes_block += f"\n\nMemory:\n{memory_notes}"
+
         prompt = f"""You are a research analyst. Write a comprehensive report of minimum 1200 words on '{topic}'. Use the following sources:
 
 {context}
+{notes_block}
 
 Format the report in markdown with the following required sections:
 
@@ -61,11 +76,25 @@ IMPORTANT INSTRUCTIONS:
 
         logger.info("Calling LLM to generate draft report")
         response = await call_llm(prompt)
+        word_count = len(response.split())
         logger.info(f"Draft report generated: {len(response)} characters")
 
         state["draft_report"] = response
         state["current_step"] = "writer_complete"
         state["error"] = None
+
+        add_agent_message(
+            state,
+            "writer",
+            f"Drafted report with {word_count} words.",
+            {"word_count": word_count},
+        )
+        await append_memory_entry(
+            state,
+            "writer",
+            f"Drafted report with {word_count} words.",
+            {"word_count": word_count},
+        )
 
         logger.info(f"Writer node completed for session {session_id}")
         return state

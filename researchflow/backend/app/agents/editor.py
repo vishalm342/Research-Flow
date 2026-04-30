@@ -1,6 +1,12 @@
 import uuid
 from datetime import datetime, timezone
 from app.agents.state import AgentState
+from app.agents.context import (
+    add_agent_message,
+    append_memory_entry,
+    format_agent_messages,
+    format_memory_context,
+)
 from app.tools.llm import call_llm
 from app.models.research import Report, ResearchSession
 from app.utils.logger import logger
@@ -22,20 +28,23 @@ async def editor_node(state: AgentState) -> AgentState:
 
         word_count = len(draft_report.split())
         logger.info(f"Draft report word count: {word_count}")
+        logger.info("Draft report approved by critic, polishing...")
 
-        if word_count < 500 and state["retry_count"] < 2:
-            logger.warning(f"Draft report too short ({word_count} words), requesting rewrite")
-
-            state["retry_count"] += 1
-            state["current_step"] = "needs_rewrite"
-
-            return state
-
-        logger.info("Draft report quality acceptable, polishing...")
+        critic_feedback = state.get("critic_feedback", "")
+        agent_notes = format_agent_messages(state)
+        memory_notes = format_memory_context(state)
+        notes_block = ""
+        if critic_feedback:
+            notes_block += f"\n\nCritic feedback:\n{critic_feedback}"
+        if agent_notes:
+            notes_block += f"\n\nAgent Notes:\n{agent_notes}"
+        if memory_notes:
+            notes_block += f"\n\nMemory:\n{memory_notes}"
 
         polish_prompt = f"""Review and polish this research report for clarity, grammar, and flow:
 
 {draft_report}
+{notes_block}
 
 Improve the structure, fix any grammatical errors, enhance readability, and ensure all sections flow logically. Maintain all citations and sources."""
         
@@ -77,6 +86,19 @@ Improve the structure, fix any grammatical errors, enhance readability, and ensu
         state["final_report"] = final_report
         state["current_step"] = "complete"
         state["error"] = None
+
+        add_agent_message(
+            state,
+            "editor",
+            f"Polished report with {len(final_report.split())} words.",
+            {"quality_score": quality_score},
+        )
+        await append_memory_entry(
+            state,
+            "editor",
+            f"Polished report with {len(final_report.split())} words.",
+            {"quality_score": quality_score},
+        )
 
         logger.info(f"Editor node completed for session {session_id}")
         return state

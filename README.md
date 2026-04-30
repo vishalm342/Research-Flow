@@ -9,7 +9,7 @@
 [![Groq](https://img.shields.io/badge/Powered%20By-SambaNova-red)](https://sambanova.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-**ResearchFlow** is an autonomous AI programming agent system designed to conduct in-depth internet research and generate high-quality, comprehensive reports. By orchestrating a team of specialized AI agents—a **Researcher**, a **Writer**, and an **Editor**—ResearchFlow transforms a single user prompt into a polished, citation-backed document, turning hours of manual work into a seamless automated workflow.
+**ResearchFlow** is a LangGraph-based multi-step research pipeline with conditional routing, designed to conduct in-depth internet research and generate high-quality, comprehensive reports. By orchestrating specialized steps—a **Researcher**, **Writer**, **Critic**, **Editor**, and optional **Refiner**—ResearchFlow transforms a single user prompt into a polished, citation-backed document, turning hours of manual work into a seamless automated workflow.
 
 ---
 
@@ -41,12 +41,40 @@ In the era of information overload, finding accurately sourced summaries is diff
 ResearchFlow treats the research process as a state machine via LangGraph:
 
 1.  **User Input:** Topic is received via the Frontend.
-2.  **Research Phase:** The **Researcher** generates search queries, fetches content using Tavily/DuckDuckGo, and summarizes findings.
-3.  **Drafting Phase:** The **Writer** takes the research data and produces a first draft.
-4.  **Review Phase:** The **Editor** critiques the draft.
-    *   *If valid:* The workflow ends.
-    *   *If invalid:* The Editor provides feedback, and control loops back to the **Writer**.
-5.  **Delivery:** The final report is streamed to the user.
+2.  **Parallel Research Phase:** Two research branches run in parallel (primary + recent trends), then merge sources.
+3.  **Drafting Phase:** The **Writer** turns research data into a full draft.
+4.  **Critique Phase:** The **Critic** scores the draft and decides whether a rewrite is required.
+5.  **Editing Phase:** The **Editor** polishes the accepted draft.
+6.  **Supervisor Routing:** The **Supervisor** routes to **Refiner** (if requested) or ends the flow.
+7.  **Delivery:** The final report is streamed to the user.
+
+---
+
+## 🧭 Multi-Agent Orchestration Roadmap
+
+The workflow is built as a state graph with explicit routing decisions and memory-aware agents. Recent orchestration upgrades include:
+
+*   **LLM Supervisor Routing:** An LLM-driven router chooses between **writer**, **refiner**, or **end** based on state and user intent.
+*   **Parallel Research Fan-Out:** Two research branches run in parallel and merge into a single, deduplicated source set.
+*   **Critic Gate:** A critic node scores draft quality and decides whether rewrites are needed.
+*   **Agent Message History:** Each agent appends structured notes so downstream agents can reference prior outputs.
+*   **Opt-In Memory:** Short-term memory lives in workflow state while long-term memory persists to MongoDB.
+
+```mermaid
+graph TD
+    A[START] --> B1[researcher_primary]
+    A --> B2[researcher_trends]
+    B1 --> C[research_merge]
+    B2 --> C
+    C --> D[writer]
+    D --> E[critic]
+    E -->|rewrite| D
+    E -->|accept| F[editor]
+    F --> G[supervisor]
+    G -->|refine| H[refiner]
+    G -->|end| I[END]
+    H --> I
+```
 
 ---
 

@@ -2,6 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from app.config import settings
 from app.models.research import ResearchSession, Report
+from app.models.memory import ResearchMemory
 from app.models.conversation import Conversation
 from app.models.message import Message
 
@@ -23,6 +24,7 @@ async def connect_to_mongo():
         document_models=[
             ResearchSession,
             Report,
+            ResearchMemory,
             Conversation,
             Message,
         ],

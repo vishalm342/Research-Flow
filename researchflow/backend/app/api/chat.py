@@ -347,6 +347,8 @@ async def send_message(
                 progress=0,
                 current_agent=None,
                 error_message=None,
+                refinement_query=request.refinement_query,
+                memory_enabled=request.enable_memory,
             )
             # Store the conversation_id so the workflow can post results back
             await session.insert()
