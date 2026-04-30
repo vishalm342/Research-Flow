@@ -21,9 +21,12 @@ async def _run_research_query(query: str, max_results: int = 8, max_urls: int = 
     return {"search_results": search_results, "scraped_content": scraped_content}
 
 
-async def researcher_primary_node(state: AgentState) -> AgentState:
+async def researcher_primary_node(state: AgentState) -> dict:
     """
     Primary researcher branch - searches the web and scrapes relevant content.
+    
+    IMPORTANT: Return only the fields this node updates to avoid LangGraph
+    concurrent update conflicts when parallel nodes run.
     """
     try:
         session_id = state["session_id"]
@@ -31,9 +34,7 @@ async def researcher_primary_node(state: AgentState) -> AgentState:
         logger.info(f"Primary researcher started for session {session_id}, topic: {topic}")
 
         results = await _run_research_query(topic)
-        state["search_results_primary"] = results["search_results"]
-        state["scraped_content_primary"] = results["scraped_content"]
-
+        
         add_agent_message(
             state,
             "researcher_primary",
@@ -46,18 +47,28 @@ async def researcher_primary_node(state: AgentState) -> AgentState:
             f"Collected {len(results['search_results'])} results for main query.",
             {"query": topic, "sources": len(results["scraped_content"])},
         )
-        return state
+        
+        # Return ONLY the fields this node updates
+        return {
+            "search_results_primary": results["search_results"],
+            "scraped_content_primary": results["scraped_content"],
+        }
 
     except Exception as e:
         error_msg = f"Primary researcher failed: {str(e)}"
         logger.error(error_msg)
-        state["research_errors"] = list(state.get("research_errors", [])) + [error_msg]
-        return state
+        # Return error in research_errors (Annotated field that merges parallel updates)
+        return {
+            "research_errors": [error_msg],
+        }
 
 
-async def researcher_trends_node(state: AgentState) -> AgentState:
+async def researcher_trends_node(state: AgentState) -> dict:
     """
     Secondary researcher branch for recent developments.
+    
+    IMPORTANT: Return only the fields this node updates to avoid LangGraph
+    concurrent update conflicts when parallel nodes run.
     """
     try:
         session_id = state["session_id"]
@@ -66,9 +77,7 @@ async def researcher_trends_node(state: AgentState) -> AgentState:
         logger.info(f"Trends researcher started for session {session_id}, query: {query}")
 
         results = await _run_research_query(query)
-        state["search_results_secondary"] = results["search_results"]
-        state["scraped_content_secondary"] = results["scraped_content"]
-
+        
         add_agent_message(
             state,
             "researcher_trends",
@@ -81,16 +90,23 @@ async def researcher_trends_node(state: AgentState) -> AgentState:
             f"Collected {len(results['search_results'])} results for trends query.",
             {"query": query, "sources": len(results["scraped_content"])},
         )
-        return state
+        
+        # Return ONLY the fields this node updates
+        return {
+            "search_results_secondary": results["search_results"],
+            "scraped_content_secondary": results["scraped_content"],
+        }
 
     except Exception as e:
         error_msg = f"Trends researcher failed: {str(e)}"
         logger.error(error_msg)
-        state["research_errors"] = list(state.get("research_errors", [])) + [error_msg]
-        return state
+        # Return error in research_errors (Annotated field that merges parallel updates)
+        return {
+            "research_errors": [error_msg],
+        }
 
 
-async def research_merge_node(state: AgentState) -> AgentState:
+async def research_merge_node(state: AgentState) -> dict:
     """
     Merge node for parallel research branches.
     """
@@ -119,12 +135,6 @@ async def research_merge_node(state: AgentState) -> AgentState:
                 seen_scraped.add(url)
                 combined_scraped.append(item)
 
-        state["search_results"] = combined_results
-        state["scraped_content"] = combined_scraped
-        state["current_step"] = "researcher_complete"
-        if combined_results:
-            state["error"] = None
-
         add_agent_message(
             state,
             "research_merge",
@@ -137,23 +147,31 @@ async def research_merge_node(state: AgentState) -> AgentState:
             f"Merged {len(combined_results)} unique results from parallel research.",
             {"sources": len(combined_scraped)},
         )
-        return state
+        
+        return {
+            "search_results": combined_results,
+            "scraped_content": combined_scraped,
+            "current_step": "researcher_complete",
+            "error": None if combined_results else state.get("error"),
+        }
 
     except Exception as e:
         error_msg = f"Research merge failed: {str(e)}"
         logger.error(error_msg)
-        state["error"] = error_msg
-        state["current_step"] = "researcher_failed"
-
-        try:
-            session_id = state.get("session_id")
-            if session_id:
+        state_dict = state or {}
+        session_id = state_dict.get("session_id")
+        
+        if session_id:
+            try:
                 session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
                 if session:
                     session.status = "failed"
                     session.error_message = error_msg
                     await session.save()
-        except Exception as db_error:
-            logger.error(f"Failed to update session status in DB: {db_error}")
+            except Exception as db_error:
+                logger.error(f"Failed to update session status in DB: {db_error}")
 
-        return state
+        return {
+            "error": error_msg,
+            "current_step": "researcher_failed",
+        }
