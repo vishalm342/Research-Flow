@@ -83,7 +83,7 @@ graph TD
 ### Backend
 *   **Core:** Python 3.11+, FastAPI
 *   **AI Orchestration:** LangChain, LangGraph
-*   **LLM Provider:** Groq (primary), OpenAI (compatible)
+*   **LLM Provider:** SambaNova (primary), OpenAI (compatible)
 *   **Search & Scrape:** Tavily API, DuckDuckGo Search, BeautifulSoup4
 *   **Database:** MongoDB (Motor async driver)
 
@@ -117,7 +117,7 @@ graph TD
     
     `backend/.env`:
     ```env
-    GROQ_API_KEY=gsk_...
+    SAMBANOVA_API_KEY=gsk_...
     TAVILY_API_KEY=tvly-...
     MONGODB_URL=mongodb://mongodb:27017
     ```
