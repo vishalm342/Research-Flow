@@ -363,7 +363,7 @@ async def send_message(
                     "I'll post the full report here once it's ready."
                 ),
                 created_at=datetime.now(timezone.utc),
-                metadata={"research_id": session_id},
+                metadata={"type": "research_report", "research_id": session_id},
             )
             await assistant_message.insert()
 
