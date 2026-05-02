@@ -16,8 +16,20 @@ class ResearchSession(Document):
     error_message: Optional[str] = Field(default=None, description="Error message if failed")
     refinement_query: Optional[str] = Field(default=None, description="Optional refinement focus")
     memory_enabled: bool = Field(default=False, description="Enable long-term memory storage")
+    agent_events: List[dict] = Field(default_factory=list, description="List of all agent activities")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     quality_score: Optional[float] = None
+
+    async def add_agent_event(self, agent_name: str, status: str, message: str, decision_data: Optional[dict] = None) -> None:
+        event = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "agent_name": agent_name,
+            "status": status,
+            "message": message,
+            "decision_data": decision_data
+        }
+        self.agent_events.append(event)
+        await self.save()
 
     class Settings:
         name = "research_sessions"
