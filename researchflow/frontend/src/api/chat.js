@@ -82,3 +82,13 @@ export const cleanupEmptyConversations = async () => {
   const response = await api.delete('/api/conversations/cleanup/empty');
   return response.data;
 };
+
+/**
+ * Get research status by session ID.
+ * @param {string} sessionId
+ * @returns {Promise<{ session_id, status, progress, current_agent, report_id, error_message }>}
+ */
+export const getResearchStatus = async (sessionId) => {
+  const response = await api.get(`/api/status/${sessionId}`);
+  return response.data;
+};

@@ -7,10 +7,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        workspace: '#1e293b',
-        sidebar:   '#0f172a',
-        accent:    '#6366f1',
-        panel:     '#334155',
+        workspace: '#0a0a0a',
+        sidebar:   '#020202',
+        accent:    '#10b981',
+        panel:     '#18181b',
       },
       keyframes: {
         fadeIn: {
