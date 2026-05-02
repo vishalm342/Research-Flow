@@ -57,17 +57,30 @@ def _route_after_refiner(state: AgentState) -> str:
 # Build the compiled graph (module-level singleton, reused across requests)
 # ---------------------------------------------------------------------------
 
+def _wrap_node_with_running_event(node_func, node_name):
+    async def wrapped(state: AgentState):
+        session_id = state.get("session_id")
+        if session_id:
+            try:
+                session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
+                if session:
+                    await session.add_agent_event(node_name, "running", f"{node_name.replace('_', ' ').title()} is now running")
+            except Exception as e:
+                logger.error(f"Error emitting running event for {node_name}: {e}")
+        return await node_func(state)
+    return wrapped
+
 def _build_graph():
     builder = StateGraph(AgentState)
 
-    builder.add_node("researcher_primary", researcher_primary_node)
-    builder.add_node("researcher_trends", researcher_trends_node)
-    builder.add_node("research_merge", research_merge_node)
-    builder.add_node("writer", writer_node)
-    builder.add_node("critic", critic_node)
-    builder.add_node("editor", editor_node)
-    builder.add_node("supervisor", supervisor_node)
-    builder.add_node("refiner", refiner_node)
+    builder.add_node("researcher_primary", _wrap_node_with_running_event(researcher_primary_node, "researcher_primary"))
+    builder.add_node("researcher_trends", _wrap_node_with_running_event(researcher_trends_node, "researcher_trends"))
+    builder.add_node("research_merge", _wrap_node_with_running_event(research_merge_node, "research_merge"))
+    builder.add_node("writer", _wrap_node_with_running_event(writer_node, "writer"))
+    builder.add_node("critic", _wrap_node_with_running_event(critic_node, "critic"))
+    builder.add_node("editor", _wrap_node_with_running_event(editor_node, "editor"))
+    builder.add_node("supervisor", _wrap_node_with_running_event(supervisor_node, "supervisor"))
+    builder.add_node("refiner", _wrap_node_with_running_event(refiner_node, "refiner"))
 
     builder.add_edge(START, "researcher_primary")
     builder.add_edge(START, "researcher_trends")
@@ -105,78 +118,22 @@ def _build_graph():
 _compiled_graph = _build_graph()
 
 
+
 # ---------------------------------------------------------------------------
 # Sequential status event emission
 # ---------------------------------------------------------------------------
 
 async def _emit_sequential_status_events(session_id: str, final_state: AgentState) -> None:
-    """
-    Emit agent status events in strict sequence: running → complete for each agent.
-    
-    This is called AFTER the workflow graph completes to emit all status events
-    in a controlled, sequential manner using await between each event.
-    
-    The sequence is:
-      researcher: running → researcher: complete
-      writer: running → writer: complete
-      editor: running → editor: complete
-      refiner: running → refiner: complete (if it ran)
-      workflow_complete
-    
-    Parameters
-    ----------
-    session_id : str
-        The research session ID.
-    final_state : AgentState
-        The final state from the completed graph execution.
-    """
     try:
-        # Determine which agents were executed in the workflow
-        # The workflow always runs: researcher → writer → editor
-        agents_sequence = ["researcher", "writer", "editor"]
-        
-        # Check if refiner was executed
-        # The refiner runs if refinement_query was set AND graph completed successfully
-        if (
-            final_state.get("refinement_query") 
-            and final_state.get("current_step") == "complete"
-        ):
-            agents_sequence.append("refiner")
-        
-        # Emit each agent's running and complete events sequentially
-        for agent_name in agents_sequence:
-            # Emit running status
-            session = await ResearchSession.find_one(
-                ResearchSession.session_id == session_id
-            )
-            if session:
-                session.status = f"{agent_name}_running"
-                session.current_agent = agent_name
-                await session.save()
-                logger.info(f"[{session_id}] Emitted status: {agent_name}_running")
-            
-            # Emit complete status (with await to ensure sequencing)
-            session = await ResearchSession.find_one(
-                ResearchSession.session_id == session_id
-            )
-            if session:
-                session.status = f"{agent_name}_complete"
-                session.current_agent = agent_name
-                await session.save()
-                logger.info(f"[{session_id}] Emitted status: {agent_name}_complete")
-        
-        # Finally emit workflow_complete event
-        session = await ResearchSession.find_one(
-            ResearchSession.session_id == session_id
-        )
+        session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
         if session:
             session.status = "complete"
             session.progress = 100
             await session.save()
             logger.info(f"[{session_id}] Emitted status: workflow_complete")
-            
     except Exception as e:
-        logger.error(f"[{session_id}] Failed to emit sequential status events: {e}")
+        logger.error(f"[{session_id}] Failed to emit status events: {e}")
+
 
 
 
@@ -249,7 +206,23 @@ async def run_research_workflow(
         }
 
         logger.info(f"[{session_id}] Starting research workflow — topic: {topic!r}")
-        final_state: AgentState = await _compiled_graph.ainvoke(initial_state)
+        final_state = initial_state
+        async for output in _compiled_graph.astream(initial_state):
+            for node_name, state_update in output.items():
+                if isinstance(state_update, dict):
+                    final_state.update(state_update)
+                sess = await ResearchSession.find_one(ResearchSession.session_id == session_id)
+                if sess:
+                    decision_data = None
+                    msg = f"Completed step: {node_name}"
+                    if node_name == "critic":
+                        decision_data = {"decision": final_state.get("critic_decision")}
+                        msg = f"Decision: {final_state.get('critic_decision')}"
+                    elif node_name == "supervisor":
+                        decision_data = {"decision": final_state.get("router_decision")}
+                        msg = f"Routed to: {final_state.get('router_decision')}"
+                    
+                    await sess.add_agent_event(node_name, "complete", msg, decision_data)
         logger.info(f"[{session_id}] Research workflow finished")
         
         # ------------------------------------------------------------------
