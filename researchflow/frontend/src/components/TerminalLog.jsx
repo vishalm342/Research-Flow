@@ -1,273 +1,232 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  ChevronDown,
-  ChevronUp,
-  Terminal,
-  Search,
-  PenLine,
-  CheckCircle2,
-  Wand2,
-} from 'lucide-react';
-import { getResearchStatus } from '../api/research';
+import { ChevronDown, ChevronUp, Terminal } from 'lucide-react';
+import { API_BASE_URL } from '../utils/constants';
 
 const AGENT_EMOJIS = {
-  researcher: '🔍',
+  researcher_primary: '🔍',
+  researcher_trends: '🔄',
   writer: '✍️',
+  critic: '👁️',
   editor: '✅',
   refiner: '🔧',
+  supervisor: '🧠',
+  research_merge: '🔗',
+  general: '🤖'
 };
 
-const TerminalLog = ({ sessionId, onComplete, onWorkflowComplete }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+const WORKFLOW_NODES = [
+  { id: 'researcher_primary', name: 'Primary Researcher', emoji: '🔍' },
+  { id: 'researcher_trends', name: 'Trends Researcher', emoji: '🔄' },
+  { id: 'research_merge', name: 'Merge Data', emoji: '🔗' },
+  { id: 'writer', name: 'Writer Agent', emoji: '✍️' },
+  { id: 'critic', name: 'Critic Agent', emoji: '👁️' },
+  { id: 'editor', name: 'Editor Agent', emoji: '✅' },
+  { id: 'supervisor', name: 'Supervisor', emoji: '🧠' },
+  { id: 'refiner', name: 'Refiner Agent', emoji: '🔧' }
+];
+
+const TerminalLog = ({ sessionId, conversationId, onComplete, onWorkflowComplete }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
   const [logs, setLogs] = useState([]);
-  const [status, setStatus] = useState(null);
+  const [workflowDone, setWorkflowDone] = useState(false);
   const terminalRef = useRef(null);
-  const pollIntervalRef = useRef(null);
-  const completedFiredRef = useRef(false); // guard: fire onComplete exactly once
-  const workflowCompleteCalledRef = useRef(false); // guard: fire onWorkflowComplete exactly once
+
+  const [nodeStatuses, setNodeStatuses] = useState({
+    researcher_primary: 'idle',
+    researcher_trends: 'idle',
+    research_merge: 'idle',
+    writer: 'idle',
+    critic: 'idle',
+    editor: 'idle',
+    supervisor: 'idle',
+    refiner: 'idle'
+  });
+
+  const callbacksRef = useRef({ onComplete, onWorkflowComplete });
+  useEffect(() => {
+    callbacksRef.current = { onComplete, onWorkflowComplete };
+  }, [onComplete, onWorkflowComplete]);
 
   useEffect(() => {
-    const pollLogs = async () => {
+    if (!sessionId) return;
+    
+    // auto expand begin
+    setLogs(['🚀 Starting research workflow...']);
+    
+    // Connect to SSE stream
+    const eventSource = new EventSource(`${API_BASE_URL}/api/status/${sessionId}/stream`);
+    
+    eventSource.onmessage = (event) => {
       try {
-        const statusData = await getResearchStatus(sessionId);
-        setStatus(statusData);
-
-        // Build log entries from status
-        const newLogs = [];
-
-        if (statusData.status === 'pending') {
-          newLogs.push('🚀 Initializing research workflow...');
+        const data = JSON.parse(event.data);
+        
+        if (data.error) {
+          setLogs(prev => [...prev, `❌ Error: ${data.error}`]);
+          eventSource.close();
+          return;
         }
 
-        if (statusData.current_agent === 'researcher') {
-          newLogs.push(`${AGENT_EMOJIS.researcher} Researcher Agent: Searching web and scraping sources...`);
-          newLogs.push(`   Progress: ${statusData.progress}%`);
-        }
-
-        if (statusData.status === 'researcher_complete' || statusData.current_agent === 'writer') {
-          newLogs.push(`${AGENT_EMOJIS.researcher} Researcher Agent: ✓ Complete`);
-          if (statusData.current_agent === 'writer') {
-            newLogs.push(`${AGENT_EMOJIS.writer} Writer Agent: Generating draft report...`);
-            newLogs.push(`   Progress: ${statusData.progress}%`);
+        // Handle simple status updates (fallback)
+        if (data.status && !data.agent_name) {
+          if (data.status === 'completed' || data.status === 'complete') {
+            setNodeStatuses(prev => {
+              const updated = { ...prev };
+              Object.keys(updated).forEach(k => {
+                updated[k] = 'complete';
+              });
+              return updated;
+            });
+            setLogs(prev => [...prev, '✅ Research workflow complete!']);
+            if (data.report_id) {
+               setLogs(prev => [...prev, `📄 Report ID: ${data.report_id}`]);
+            }
+            setWorkflowDone(true);
+            setTimeout(() => callbacksRef.current.onWorkflowComplete?.(sessionId, conversationId), 1000);
+            setTimeout(() => callbacksRef.current.onComplete?.(), 2000);
+            eventSource.close();
+          } else if (data.status === 'failed') {
+            setLogs(prev => [...prev, `❌ Workflow failed`]);
+            eventSource.close();
           }
+          return;
         }
 
-        if (statusData.status === 'writer_complete' || statusData.current_agent === 'editor') {
-          newLogs.push(`${AGENT_EMOJIS.writer} Writer Agent: ✓ Complete`);
-          if (statusData.current_agent === 'editor') {
-            newLogs.push(`${AGENT_EMOJIS.editor} Editor Agent: Reviewing and polishing...`);
-            newLogs.push(`   Progress: ${statusData.progress}%`);
-          }
-        }
+        // Handle specific agent events
+        if (data.agent_name && data.status) {
+          setNodeStatuses(prev => ({
+            ...prev,
+            [data.agent_name]: data.status
+          }));
 
-        if (statusData.current_agent === 'refiner') {
-          newLogs.push(`${AGENT_EMOJIS.editor} Editor Agent: ✓ Complete`);
-          newLogs.push(`${AGENT_EMOJIS.refiner} Refiner Agent: Applying refinements...`);
-          newLogs.push(`   Progress: ${statusData.progress}%`);
-        }
-
-        if (statusData.status === 'complete') {
-          newLogs.push(`${AGENT_EMOJIS.editor} Editor Agent: ✓ Complete`);
-          newLogs.push('✅ Research workflow complete!');
-          newLogs.push(`📄 Report ID: ${statusData.report_id}`);
+          const emoji = AGENT_EMOJIS[data.agent_name] || AGENT_EMOJIS.general;
+          const agentNameDisplay = data.agent_name.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
           
-          if (!workflowCompleteCalledRef.current) {
-            workflowCompleteCalledRef.current = true;
-            // Trigger the report finalization with 4-second delay
-            // Pass sessionId so parent can track which research is being finalized
-            onWorkflowComplete?.(sessionId);
-          }
+          let logStr = `${emoji} ${agentNameDisplay}: ${data.message || data.status}`;
           
-          if (!completedFiredRef.current) {
-            completedFiredRef.current = true;
-            setTimeout(() => {
-              onComplete?.();
-              clearInterval(pollIntervalRef.current);
-            }, 1500);
-          }
+          setLogs(prev => {
+            const newLogs = [...prev];
+            if (newLogs.length > 0 && newLogs[newLogs.length-1].includes(`${agentNameDisplay}:`)) {
+               newLogs.push(`   └─ ${data.message || data.status}`);
+            } else {
+               newLogs.push(logStr);
+            }
+            return newLogs;
+          });
         }
-
-        if (statusData.status === 'failed') {
-          newLogs.push(`❌ Workflow failed: ${statusData.error_message || 'Unknown error'}`);
-          
-          if (!completedFiredRef.current) {
-            completedFiredRef.current = true;
-            setTimeout(() => {
-              onComplete?.();
-              clearInterval(pollIntervalRef.current);
-            }, 1500);
-          }
-        }
-
-        setLogs(newLogs);
-
-        // Auto-scroll when expanded
-        if (isExpanded && terminalRef.current) {
-          terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-        }
+        
       } catch (err) {
-        console.error('Failed to fetch research status:', err);
+        console.error('Error parsing SSE data', err);
       }
     };
 
-    completedFiredRef.current = false; // reset if sessionId changes
-    workflowCompleteCalledRef.current = false; // reset if sessionId changes
-    pollLogs();
-    pollIntervalRef.current = setInterval(pollLogs, 2000);
-
-    return () => {
-      clearInterval(pollIntervalRef.current);
+    eventSource.onerror = (err) => {
+       console.error("SSE Error:", err);
+       eventSource.close();
     };
-  }, [sessionId]); // isExpanded intentionally omitted to avoid restarting poll
 
-  // Separate effect just for auto-scrolling when expanded state changes
+    // Cleanup
+    return () => {
+      eventSource.close();
+    };
+  }, [sessionId, conversationId]);
+
   useEffect(() => {
-    if (isExpanded && terminalRef.current) {
+    if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
-  }, [isExpanded, logs]);
-
-  const isComplete = status?.status === 'complete' || status?.status === 'failed';
+  }, [logs]);
 
   return (
-    <div className="flex flex-col gap-3 mt-2">
-      <button
+    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl rounded-tl-sm overflow-hidden shadow-sm w-full transition-all duration-300">
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-zinc-800/50 border-b border-zinc-700/50 cursor-pointer hover:bg-zinc-800/70 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="
-          flex items-center gap-3 text-sm text-zinc-400
-          bg-zinc-900 border border-zinc-800
-          px-4 py-3 rounded-md cursor-pointer
-          hover:bg-zinc-800 transition-all w-fit shadow-sm
-        "
       >
-        <Terminal size={16} className={isComplete ? "text-emerald-500" : "text-zinc-500"} />
-        <span className="font-medium tracking-tight">
-          {isComplete
-            ? 'Research workflow complete'
-            : 'Processing research workflow...'}
-        </span>
-        <div className="ml-2 text-zinc-600">
-          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        <div className="flex items-center gap-2">
+          <Terminal size={16} className="text-emerald-500" />
+          <span className="text-sm font-semibold text-zinc-300">
+            Research Workflow & Agent Terminal
+            {workflowDone && <span className="ml-2 text-emerald-500">✓ Complete</span>}
+          </span>
         </div>
-      </button>
+        <button className="text-zinc-400 hover:text-zinc-200 transition-colors">
+          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+      </div>
 
       {isExpanded && (
-        <div
-          ref={terminalRef}
-          className="
-            bg-zinc-900 border border-zinc-800 rounded-lg
-            p-2 overflow-y-auto shadow-2xl w-full max-w-3xl
-            space-y-1
-          "
-        >
-          {[
-            {
-              key: 'researcher',
-              name: 'Researcher',
-              Icon: Search,
-              active: status?.current_agent === 'researcher',
-              done: status?.status === 'researcher_complete'
-                || status?.current_agent === 'writer'
-                || status?.current_agent === 'editor'
-                || status?.current_agent === 'refiner'
-                || status?.status === 'complete',
-              activeText: 'Searching the web...',
-            },
-            {
-              key: 'writer',
-              name: 'Writer',
-              Icon: PenLine,
-              active: status?.current_agent === 'writer',
-              done: status?.status === 'writer_complete'
-                || status?.current_agent === 'editor'
-                || status?.current_agent === 'refiner'
-                || status?.status === 'complete',
-              activeText: 'Writing draft...',
-            },
-            {
-              key: 'editor',
-              name: 'Editor',
-              Icon: CheckCircle2,
-              active: status?.current_agent === 'editor',
-              done: status?.current_agent === 'refiner' || status?.status === 'complete',
-              activeText: 'Reviewing draft...',
-            },
-            {
-              key: 'refiner',
-              name: 'Refiner',
-              Icon: Wand2,
-              active: status?.current_agent === 'refiner',
-              done: status?.status === 'complete',
-              activeText: 'Applying refinements...',
-            },
-          ].map((agent) => {
-            const rowState = agent.active ? 'active' : agent.done ? 'done' : 'pending';
-            
-            return (
-              <div 
-                key={agent.key} 
-                className={`
-                  relative p-3 border-l-2 transition-all duration-300
-                  ${rowState === 'active' ? 'bg-emerald-900/20 border-l-emerald-500' : ''}
-                  ${rowState === 'done' ? 'bg-zinc-900/40 border-l-emerald-600/50' : ''}
-                  ${rowState === 'pending' ? 'bg-zinc-900/20 border-l-zinc-700' : ''}
-                `}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="shrink-0 h-8 w-8 rounded bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                    <agent.Icon 
-                      size={14} 
-                      className={rowState === 'active' ? 'text-emerald-400' : rowState === 'done' ? 'text-emerald-500' : 'text-zinc-600'} 
-                    />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-medium ${rowState === 'pending' ? 'text-zinc-500' : 'text-zinc-200'}`}>
-                        {agent.name}
-                      </span>
-                      {rowState === 'active' && (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-400">Running</span>
-                        </div>
-                      )}
+        <div className="flex flex-col">
+          {/* Real-time Parallel Node Tracker */}
+          <div className="px-4 py-4 border-b border-zinc-800/80 bg-zinc-900/40">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {WORKFLOW_NODES.map((node) => {
+                const status = nodeStatuses[node.id] || 'idle';
+                const isRunning = status === 'running';
+                const isComplete = status === 'complete';
+                
+                return (
+                  <div
+                    key={node.id}
+                    className={`relative flex items-center gap-3 p-3 rounded-xl border transition-all duration-300 ${
+                      isRunning
+                        ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.2)] scale-[1.02]'
+                        : isComplete
+                        ? 'bg-zinc-800/40 border-emerald-500/30 opacity-90'
+                        : 'bg-zinc-800/10 border-zinc-800/50 opacity-40'
+                    }`}
+                  >
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-lg text-lg ${
+                      isRunning ? 'animate-pulse scale-110' : ''
+                    }`}>
+                      {node.emoji}
                     </div>
-                    
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      {rowState === 'done' && <CheckCircle2 size={10} className="text-zinc-500" />}
-                      <span className={`text-[11px] ${
-                        rowState === 'active' ? 'text-emerald-400' : 
-                        rowState === 'done' ? 'text-zinc-400' : 
-                        'text-zinc-500'
-                      }`}>
-                        {rowState === 'active' ? agent.activeText : rowState === 'done' ? 'Complete' : 'Waiting...'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {rowState === 'active' && (
-                    <div className="w-20 shrink-0 hidden sm:block">
-                      <div className="h-[2px] w-full bg-zinc-800 rounded-full overflow-hidden relative">
-                        <div className="absolute inset-0 bg-emerald-500/30" />
-                        <div className="absolute inset-0 bg-emerald-500 w-1/2 animate-[shimmer_1.5s_infinite] rounded-full" style={{
-                          backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)'
-                        }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-zinc-200 truncate leading-tight">
+                        {node.name}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          isRunning
+                            ? 'bg-emerald-400 animate-pulse'
+                            : isComplete
+                            ? 'bg-emerald-500'
+                            : 'bg-zinc-600'
+                        }`} />
+                        <span className={`text-[10px] font-medium tracking-wide uppercase ${
+                          isRunning
+                            ? 'text-emerald-400 font-bold'
+                            : isComplete
+                            ? 'text-emerald-500/80 font-bold'
+                            : 'text-zinc-500'
+                        }`}>
+                          {isRunning ? 'Running' : isComplete ? 'Complete' : 'Idle'}
+                        </span>
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {/* Animated shimmer progress bar at the bottom for active card */}
-                {rowState === 'active' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-full animate-pulse opacity-50" />
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-full animate-[shimmer_2s_infinite]" />
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Scrolling Console/Logs */}
+          <div
+            ref={terminalRef}
+            className="max-h-56 overflow-y-auto bg-black/50 px-4 py-3 font-mono text-xs text-zinc-300 space-y-1"
+          >
+            {logs.length === 0 ? (
+              <div className="text-zinc-500">Connecting to agent stream...</div>
+            ) : (
+              logs.map((log, idx) => (
+                <div key={idx} className={`${log.includes('└─') ? 'text-zinc-400 pl-4' : 'text-zinc-300'} leading-relaxed`}>
+                  {log}
+                </div>
+              ))
+            )}
+            {!workflowDone && logs.length > 0 && (
+              <div className="animate-pulse text-emerald-500 mt-2">▌</div>
+            )}
+          </div>
         </div>
       )}
     </div>
