@@ -131,16 +131,16 @@ const ChatWorkspace = () => {
         <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
           {/* Glow orb */}
           <div className="relative mb-8">
-            <div className="absolute inset-0 rounded-full bg-indigo-500/20 blur-3xl scale-150 pointer-events-none" />
-            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-2xl">
-              <span className="text-2xl">✦</span>
+            <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-3xl scale-150 pointer-events-none" />
+            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-2xl">
+              <span className="text-2xl text-black">✦</span>
             </div>
           </div>
 
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-3 text-center">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent mb-3 text-center">
             What do you want to research?
           </h1>
-          <p className="text-slate-400 text-sm mb-10 text-center max-w-md">
+          <p className="text-zinc-400 text-sm mb-10 text-center max-w-md">
             Ask anything or pick a suggestion below — I'll run a full multi-agent
             deep-research workflow for you.
           </p>
@@ -167,9 +167,9 @@ const ChatWorkspace = () => {
                 }}
                 className="
                   px-4 py-2 rounded-full text-sm
-                  bg-slate-800/70 border border-slate-700/60
-                  text-slate-300 hover:text-white
-                  hover:bg-slate-700/80 hover:border-indigo-500/50
+                  bg-zinc-900 border border-zinc-800
+                  text-zinc-300 hover:text-white
+                  hover:bg-zinc-800 hover:border-emerald-500/50
                   transition-all duration-150 backdrop-blur-sm
                 "
               >
@@ -187,6 +187,7 @@ const ChatWorkspace = () => {
                 <ChatMessage
                   key={msg.message_id}
                   message={msg}
+                  onEdit={setInput}
                   onResearchComplete={() =>
                     handleResearchComplete(
                       msg.conversation_id ?? currentConvId,
@@ -198,8 +199,8 @@ const ChatWorkspace = () => {
 
               {loading && (
                 <div className="flex justify-start">
-                  <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl px-5 py-4">
-                    <div className="flex items-center gap-2 text-slate-400">
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4">
+                    <div className="flex items-center gap-2 text-emerald-400/80">
                       <Loader className="animate-spin" size={16} />
                       <span className="text-sm">Thinking…</span>
                     </div>
