@@ -1,10 +1,8 @@
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Search, PenTool, CheckCircle2, Zap } from 'lucide-react';
-import Logo from '../components/Logo';
 
 export default function Landing() {
-  const navigate = useNavigate();
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -65,8 +63,21 @@ export default function Landing() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <Logo size={32} showText={true} subtitle={false} />
-          <button className="px-6 py-2 border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors rounded-lg text-sm font-medium" onClick={() => navigate('/login')}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 text-emerald-500">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 12h18M3 6h18M3 18h18" />
+                <path d="M6 9l2 2 3-3m-5 6l2 2 3-3" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-semibold tracking-tight">ResearchFlow</h1>
+          </div>
+          <button className="px-6 py-2 border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors rounded-lg text-sm font-medium">
             Sign In
           </button>
         </motion.nav>
@@ -89,7 +100,7 @@ export default function Landing() {
               animate="pulse"
             />
             <span className="text-emerald-400 text-xs font-medium">
-              Powered by LangGraph + SambaNova
+              Powered by LangGraph + SambaNova + Parallel Agents + Real-Time Streaming
             </span>
           </motion.div>
 
@@ -109,8 +120,7 @@ export default function Landing() {
             variants={itemVariants}
             className="text-lg text-zinc-400 text-center mb-12 max-w-2xl leading-relaxed"
           >
-            Four AI agents — Researcher, Writer, Editor, Refiner — working in
-            sequence to deliver polished, sourced research reports.
+            Seven autonomous AI agents — parallel researchers, critic gate, LLM-powered supervisor — collaborating with intelligent routing and real-time streaming.
           </motion.p>
 
           {/* CTAs */}
@@ -118,11 +128,11 @@ export default function Landing() {
             variants={itemVariants}
             className="flex flex-col sm:flex-row gap-4 mb-16"
           >
-            <button className="px-8 py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2" onClick={() => navigate('/login')}>
+            <button className="px-8 py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
               Start Researching
               <ArrowRight size={18} />
             </button>
-            <button className="px-8 py-3 border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors rounded-lg font-semibold" onClick={() => window.open('https://github.com/vishalm342/Research-Flow', '_blank')}>
+            <button className="px-8 py-3 border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors rounded-lg font-semibold">
               View on GitHub
             </button>
           </motion.div>
@@ -142,35 +152,41 @@ export default function Landing() {
           >
             {/* Agent Progress Items */}
             {[
-              { name: 'Researcher', status: 'Complete' },
-              { name: 'Writer', status: 'Complete' },
-              { name: 'Editor', status: 'Running' },
-              { name: 'Refiner', status: 'Pending' },
+              { name: 'Researcher Primary', status: 'Complete', desc: 'Searching + Scraping Sources' },
+              { name: 'Researcher Trends', status: 'Complete', desc: 'Latest Developments 2024-2025' },
+              { name: 'Writer', status: 'Running', desc: 'Generating Draft (1200+ words)' },
+              { name: 'Critic', status: 'Running', desc: 'Quality Score: 8.2/10' },
+              { name: 'Editor', status: 'Pending', desc: 'Polishing Report' },
+              { name: 'Supervisor', status: 'Pending', desc: 'Routing Decision' },
+              { name: 'Refiner', status: 'Pending', desc: 'Applying Refinements' },
             ].map((agent, idx) => (
-              <div key={idx} className="mb-5 last:mb-0">
-                <div className="flex items-center justify-between mb-2">
+              <div key={idx} className="mb-4 last:mb-0">
+                <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium text-white">
                     {agent.name}
                   </span>
                   <span
-                    className={`text-xs px-2 py-1 rounded-full font-semibold ${agent.status === 'Complete'
+                    className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                      agent.status === 'Complete'
                         ? 'bg-emerald-900 text-emerald-300'
                         : agent.status === 'Running'
                           ? 'bg-blue-900 text-blue-300'
                           : 'bg-zinc-800 text-zinc-400'
-                      }`}
+                    }`}
                   >
                     {agent.status}
                   </span>
                 </div>
+                <p className="text-xs text-zinc-500 mb-2">{agent.desc}</p>
                 <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
                   <motion.div
-                    className={`h-full rounded-full ${agent.status === 'Complete'
+                    className={`h-full rounded-full ${
+                      agent.status === 'Complete'
                         ? 'bg-emerald-500'
                         : agent.status === 'Running'
                           ? 'bg-blue-500'
                           : 'bg-zinc-700'
-                      }`}
+                    }`}
                     initial={{ width: agent.status === 'Complete' ? '100%' : '0%' }}
                     animate={
                       agent.status === 'Running'
@@ -195,37 +211,37 @@ export default function Landing() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.0 }}
+          transition={{ duration: 0.5 }}
           viewport={{ once: true, margin: '-100px' }}
           className="max-w-6xl mx-auto"
         >
           <h3 className="text-4xl font-light mb-16 text-white">
-            Four agents. One report.
+            Seven agents. Intelligent routing. One polished report.
           </h3>
 
           {/* Steps Flow */}
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 gap-8">
             {[
               {
                 icon: Search,
-                name: 'Researcher',
-                description: 'Searches web, gathers sources',
-              },
-              {
-                icon: PenTool,
-                name: 'Writer',
-                description: 'Drafts structured report',
+                name: 'Parallel Research',
+                description: 'Primary + Trends branches execute simultaneously, then merge sources',
               },
               {
                 icon: CheckCircle2,
-                name: 'Editor & Refiner',
-                description: 'Polishes and scores quality',
+                name: 'Quality Criticism',
+                description: 'Critic scores draft 0-10, decides accept or rewrite loop',
               },
               {
                 icon: Zap,
-                name: 'All Agents',
-                description: 'Collaborate in real-time',
-              } 
+                name: 'Intelligent Routing',
+                description: 'Supervisor LLM decides next step: Refiner, Writer, or End',
+              },
+              {
+                icon: PenTool,
+                name: 'Real-Time Collaboration',
+                description: 'Watch all 7 agents work together in live terminal stream',
+              },
             ].map((step, idx) => (
               <motion.div
                 key={idx}
@@ -251,7 +267,7 @@ export default function Landing() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.0 }}
+          transition={{ duration: 0.5 }}
           viewport={{ once: true, margin: '-100px' }}
           className="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center"
         >
@@ -276,16 +292,28 @@ export default function Landing() {
           >
             {[
               {
-                name: 'Real-time Synthesis',
-                description: 'Watch agents collaborate as they research and refine',
+                name: 'Parallel Research Execution',
+                description: 'Two researchers (primary + trends) run simultaneously. Deduplicated sources merged into single dataset.',
               },
               {
-                name: 'Verified Sources',
-                description: 'Every claim is backed by cited web sources',
+                name: 'Intelligent Quality Gate',
+                description: 'Critic agent scores drafts 0-10. Automatic rewrite loops (max 2 retries) ensure quality.',
+              },
+              {
+                name: 'LLM-Powered Routing',
+                description: 'Supervisor makes intelligent decisions via LLM. Routes between: Writer, Refiner, or End.',
+              },
+              {
+                name: 'Agent Memory & History',
+                description: 'Full audit trail of agent decisions. Agents reference previous outputs for context.',
+              },
+              {
+                name: 'Real-Time Event Streaming',
+                description: 'Live terminal showing agent collaboration. Watch parallel researchers work simultaneously.',
               },
               {
                 name: 'Export Ready',
-                description: 'Get polished reports in markdown or PDF format',
+                description: 'Get polished reports in markdown or PDF format with citations and sources.',
               },
             ].map((feature, idx) => (
               <motion.div
@@ -311,12 +339,12 @@ export default function Landing() {
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
-          transition={{ duration: 1.0 }}
+          transition={{ duration: 0.5 }}
           viewport={{ once: true }}
           className="max-w-6xl mx-auto text-center"
         >
           <p className="text-zinc-600 text-sm">
-            Built with LangGraph · FastAPI · MongoDB · SambaNova
+            Built with LangGraph · FastAPI · MongoDB · SambaNova · Tavily + DuckDuckGo · BeautifulSoup
           </p>
         </motion.div>
       </footer>
