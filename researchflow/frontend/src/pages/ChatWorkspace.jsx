@@ -1,9 +1,39 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, memo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader } from 'lucide-react';
 import { createConversation, getMessages, sendMessage } from '../api/chat';
 import ChatInput from '../components/ChatInput';
 import ChatMessage from '../components/ChatMessage';
+
+/**
+ * Memoized wrapper so the chat list never re-renders a message just because
+ * the parent re-renders (e.g. after setMessages / setLoading).
+ * It builds the stable per-message callbacks internally.
+ */
+const MemoizedChatMessage = memo(({ message, msgIdx, totalMessages, currentConvId, onEdit, onFollowup, onResearchComplete }) => {
+  const convId = message.conversation_id ?? currentConvId;
+  return (
+    <ChatMessage
+      message={message}
+      onEdit={onEdit}
+      onFollowup={onFollowup}
+      onResearchComplete={() => onResearchComplete(convId, msgIdx + 1)}
+      onWorkflowComplete={(_sessionId, wfConvId) => onResearchComplete(wfConvId ?? convId, totalMessages)}
+    />
+  );
+}, (prev, next) => {
+  // Only re-render if the message content/metadata changed, or key callbacks changed identity
+  return (
+    prev.message.message_id === next.message.message_id &&
+    prev.message.content    === next.message.content &&
+    prev.message.metadata?.report_id  === next.message.metadata?.report_id &&
+    prev.message.metadata?.research_id === next.message.metadata?.research_id &&
+    prev.totalMessages      === next.totalMessages &&
+    prev.onResearchComplete === next.onResearchComplete &&
+    prev.onFollowup         === next.onFollowup &&
+    prev.onEdit             === next.onEdit
+  );
+});
 
 const REPORT_POLL_INTERVAL_MS = 2000;
 const REPORT_POLL_TIMEOUT_MS  = 30_000;
@@ -23,6 +53,8 @@ const ChatWorkspace = () => {
   const [loading, setLoading]             = useState(false);
   const [currentConvId, setCurrentConvId] = useState(conversationId || null);
   const messagesEndRef = useRef(null);
+  // Track active poll intervals per convId to prevent duplicate polling
+  const activePollsRef = useRef({});
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,23 +81,30 @@ const ChatWorkspace = () => {
 
   const handleResearchComplete = useCallback(
     (convId, snapshotCount) => {
-      const pollRef = { id: null };
-      const safetyTimeout = setTimeout(() => {
+      // Guard: only one active poll per conversation at a time
+      if (activePollsRef.current[convId]) return;
+
+      const pollRef = { id: null, timeout: null };
+      activePollsRef.current[convId] = pollRef;
+
+      const cleanup = () => {
         clearInterval(pollRef.id);
-      }, REPORT_POLL_TIMEOUT_MS);
+        clearTimeout(pollRef.timeout);
+        delete activePollsRef.current[convId];
+      };
+
+      pollRef.timeout = setTimeout(cleanup, REPORT_POLL_TIMEOUT_MS);
 
       pollRef.id = setInterval(async () => {
         try {
           const fresh = await getMessages(convId);
           if (fresh.length > snapshotCount) {
             setMessages(fresh);
-            clearInterval(pollRef.id);
-            clearTimeout(safetyTimeout);
+            cleanup();
           }
         } catch (err) {
           console.error('Report poll failed:', err);
-          clearInterval(pollRef.id);
-          clearTimeout(safetyTimeout);
+          cleanup();
         }
       }, REPORT_POLL_INTERVAL_MS);
     },
@@ -121,6 +160,13 @@ const ChatWorkspace = () => {
       setLoading(false);
     }
   };
+
+  // Pre-fill the chat input with a follow-up question and auto-submit it as a research session
+  const handleFollowup = useCallback((question) => {
+    setInput(question);
+    // Small timeout so the input visually updates before submission
+    setTimeout(() => handleSendMessage(question, true), 80);
+  }, [loading, currentConvId, conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isEmpty = messages.length === 0;
 
@@ -184,16 +230,15 @@ const ChatWorkspace = () => {
           <div className="flex-1 overflow-y-auto px-4 py-6 scrollbar-thin">
             <div className="max-w-4xl mx-auto space-y-6">
               {messages.map((msg, idx) => (
-                <ChatMessage
+                <MemoizedChatMessage
                   key={msg.message_id}
                   message={msg}
+                  msgIdx={idx}
+                  totalMessages={messages.length}
+                  currentConvId={currentConvId}
                   onEdit={setInput}
-                  onResearchComplete={() =>
-                    handleResearchComplete(
-                      msg.conversation_id ?? currentConvId,
-                      idx + 1,
-                    )
-                  }
+                  onFollowup={handleFollowup}
+                  onResearchComplete={handleResearchComplete}
                 />
               ))}
 
