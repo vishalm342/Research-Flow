@@ -1,8 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Search, PenTool, CheckCircle2, Zap } from 'lucide-react';
 
 export default function Landing() {
+  const navigate = useNavigate();
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -77,7 +79,10 @@ export default function Landing() {
             </div>
             <h1 className="text-xl font-semibold tracking-tight">ResearchFlow</h1>
           </div>
-          <button className="px-6 py-2 border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors rounded-lg text-sm font-medium">
+          <button
+            onClick={() => navigate('/login')}
+            className="px-6 py-2 border border-zinc-700 text-zinc-300 hover:text-white hover:border-zinc-600 transition-colors rounded-lg text-sm font-medium"
+          >
             Sign In
           </button>
         </motion.nav>
@@ -128,7 +133,10 @@ export default function Landing() {
             variants={itemVariants}
             className="flex flex-col sm:flex-row gap-4 mb-16"
           >
-            <button className="px-8 py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
+            <button
+              onClick={() => navigate('/login')}
+              className="px-8 py-3 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+            >
               Start Researching
               <ArrowRight size={18} />
             </button>
