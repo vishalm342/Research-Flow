@@ -135,7 +135,7 @@ async def stream_research_status(session_id: str):
                 yield f"data: {json.dumps({'status': session.status, 'progress': session.progress, 'current_agent': session.current_agent})}\n\n"
                 last_status = session.status
             
-            if session.status in ['completed', 'failed']:
+            if session.status in ['completed', 'complete', 'failed']:
                 # Yield one final time to ensure client gets the end state
                 yield f"data: {json.dumps({'status': session.status, 'progress': session.progress, 'report_id': session.report_id})}\n\n"
                 break
