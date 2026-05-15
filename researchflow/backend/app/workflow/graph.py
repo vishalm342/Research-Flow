@@ -6,6 +6,9 @@ LangGraph research workflow:
 After the graph finishes, if a conversation_id was supplied the final report is
 posted back as an assistant Message so the chat UI can display it.
 """
+import asyncio
+import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -26,6 +29,7 @@ from app.agents.refiner import refiner_node
 from app.models.research import ResearchSession
 from app.utils.logger import logger
 from app.agents.context import load_memory_entries
+from app.tools.llm import call_llm
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +142,45 @@ async def _emit_sequential_status_events(session_id: str, final_state: AgentStat
 
 
 # ---------------------------------------------------------------------------
+# Follow-up suggestions helper
+# ---------------------------------------------------------------------------
+
+async def _generate_followups(topic: str, report: str) -> list:
+    """
+    Generate 3-4 follow-up research questions using a lightweight LLM call.
+    Returns a list of strings; falls back to [] on any error.
+    """
+    try:
+        # Use a short snippet of the report to keep the prompt compact
+        report_snippet = report[:2000] if len(report) > 2000 else report
+        prompt = f"""You are a research assistant. Based on the topic and report excerpt below, \
+generate exactly 4 concise follow-up research questions that would deepen understanding \
+or explore related angles. Return ONLY a JSON array of 4 strings, nothing else.
+
+Topic: {topic}
+
+Report excerpt:
+{report_snippet}
+
+Return format (JSON array only, no markdown):
+["question 1", "question 2", "question 3", "question 4"]"""
+
+        response = await call_llm(prompt)
+        # Strip possible markdown code fences
+        cleaned = re.sub(r"```[a-z]*\n?", "", response).strip().strip("`")
+        # Find the JSON array
+        match = re.search(r"\[.*\]", cleaned, re.DOTALL)
+        if match:
+            followups = json.loads(match.group(0))
+            # Ensure we have a list of strings
+            if isinstance(followups, list):
+                return [str(q).strip() for q in followups if q][:4]
+    except Exception as exc:
+        logger.warning(f"_generate_followups failed (non-critical): {exc}")
+    return []
+
+
+# ---------------------------------------------------------------------------
 # Public entry-point called by the background task
 # ---------------------------------------------------------------------------
 
@@ -224,12 +267,6 @@ async def run_research_workflow(
                     
                     await sess.add_agent_event(node_name, "complete", msg, decision_data)
         logger.info(f"[{session_id}] Research workflow finished")
-        
-        # ------------------------------------------------------------------
-        # 1.5. Emit sequential status events for all agents
-        # ------------------------------------------------------------------
-        # After the graph completes, emit status events in strict sequence
-        await _emit_sequential_status_events(session_id, final_state)
 
         # ------------------------------------------------------------------
         # 2. Post the finished report back to the chat conversation (if any)
@@ -237,12 +274,22 @@ async def run_research_workflow(
         if conversation_id and final_state.get("final_report"):
             final_report: str = final_state["final_report"]
 
-            # Verify conversation still exists
             conversation = await Conversation.find_one(
                 Conversation.conversation_id == conversation_id
             )
             if conversation:
                 fresh_session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
+
+                # Derive quality score
+                quality_score = (
+                    fresh_session.quality_score
+                    if fresh_session and fresh_session.quality_score is not None
+                    else final_state.get("draft_quality_score")
+                )
+
+                # ── STEP A: Insert the report immediately (followups=[] for now)
+                # This MUST happen before emitting 'complete' so the frontend
+                # poll finds the message the moment it starts looking.
                 report_message = Message(
                     message_id=str(uuid.uuid4()),
                     conversation_id=conversation_id,
@@ -253,13 +300,14 @@ async def run_research_workflow(
                         "type": "research_report",
                         "research_id": session_id,
                         "report_id": fresh_session.report_id if fresh_session else None,
-                        "quality_score": fresh_session.quality_score if fresh_session else None,
+                        "quality_score": quality_score,
+                        "followups": [],   # filled in by background task below
                         "topic": topic,
                     },
                 )
                 await report_message.insert()
 
-                # Keep conversation counters up to date
+                # Update conversation counters
                 conversation.message_count += 1
                 conversation.updated_at = datetime.now(timezone.utc)
                 await conversation.save()
@@ -268,11 +316,40 @@ async def run_research_workflow(
                     f"[{session_id}] Report posted to conversation {conversation_id} "
                     f"as message {report_message.message_id}"
                 )
+
+                # ── STEP B: NOW emit 'complete' — report is already in DB so
+                # any frontend poll triggered by this SSE event will find it.
+                await _emit_sequential_status_events(session_id, final_state)
+
+                # ── STEP C: Generate follow-ups in the background.
+                # The frontend already has the report; this just enriches it.
+                # We update the Beanie document's metadata field directly.
+                saved_message_id = report_message.message_id
+
+                async def _enrich_with_followups():
+                    try:
+                        followups = await _generate_followups(topic, final_report)
+                        if followups:
+                            msg_doc = await Message.find_one(Message.message_id == saved_message_id)
+                            if msg_doc:
+                                meta = dict(msg_doc.metadata or {})
+                                meta["followups"] = followups
+                                msg_doc.metadata = meta
+                                await msg_doc.save()
+                                logger.info(f"[{session_id}] Follow-ups saved for message {saved_message_id}")
+                    except Exception as fe:
+                        logger.warning(f"[{session_id}] Follow-up enrichment failed (non-critical): {fe}")
+
+                asyncio.create_task(_enrich_with_followups())
+
             else:
                 logger.warning(
                     f"[{session_id}] conversation_id={conversation_id} not found; "
                     "skipping report post-back."
                 )
+        else:
+            # No conversation_id — still emit complete so SSE closes cleanly
+            await _emit_sequential_status_events(session_id, final_state)
 
     except Exception as exc:
         error_msg = f"Research workflow exception: {exc}"
