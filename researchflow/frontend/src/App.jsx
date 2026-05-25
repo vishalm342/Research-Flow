@@ -11,6 +11,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<AuthPage />} />
+        <Route path="/signin" element={<AuthPage />} />
         <Route path="/app" element={
           <ProtectedRoute>
             <WorkspaceLayout>
@@ -25,7 +26,7 @@ function App() {
             </WorkspaceLayout>
           </ProtectedRoute>
         } />
-        <Route path="*" element={<LandingPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
