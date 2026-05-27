@@ -6,7 +6,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-green.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-blue)](https://react.dev/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-orange)](https://langchain-ai.github.io/langgraph/)
-[![Groq](https://img.shields.io/badge/Powered%20By-SambaNova-red)](https://sambanova.com/)
+[![SambaNova](https://img.shields.io/badge/Powered%20By-SambaNova-red)](https://sambanova.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 **ResearchFlow** is a LangGraph-based multi-step research pipeline with conditional routing, designed to conduct in-depth internet research and generate high-quality, comprehensive reports. By orchestrating specialized steps—a **Researcher**, **Writer**, **Critic**, **Editor**, and optional **Refiner**—ResearchFlow transforms a single user prompt into a polished, citation-backed document, turning hours of manual work into a seamless automated workflow.
@@ -20,7 +20,7 @@ In the era of information overload, finding accurately sourced summaries is diff
 ### The Impact
 *   **Accuracy & Grounding:** By using real-time web search (Tavily/DuckDuckGo), ResearchFlow reduces hallucinations. Every claim is cross-referenced with live data.
 *   **Depth over Breadth:** Unlike a standard chatbot that gives you one shot, ResearchFlow iterates. The **Editor** agent critiques the **Writer's** draft, forcing rewrites until quality standards are met.
-*   **Enterprise Speed:** Powered by **Groq's** LPU inference engine, complex multi-agent reasoning steps that usually take minutes happen in seconds.
+*   **Enterprise Speed:** Powered by **SambaNova's** inference engine, complex multi-agent reasoning steps that usually take minutes happen in seconds.
 *   **For Everyone:** From academic researchers to market analysts, this tool democratizes access to deep, structured report generation without needing prompt engineering expertise.
 
 ---
@@ -101,7 +101,7 @@ graph TD
 *   [Docker](https://www.docker.com/) & Docker Compose (Recommended)
 *   OR Python 3.10+ & Node.js 18+
 *   API Keys:
-    *   **Groq API Key:** For the LLM ([Get it here](https://console.groq.com/))
+    *   **SambaNova API Key:** For the LLM ([Get it here](https://cloud.sambanova.ai/))
     *   **Tavily API Key:** For search ([Get it here](https://tavily.com/))
 
 ### Installation (Docker - Recommended)
