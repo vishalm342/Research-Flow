@@ -52,39 +52,39 @@ const Research = () => {
   const progress = status?.progress ?? 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-lg text-center">
-        <h2 className="text-2xl font-bold text-indigo-700 mb-2">Research in Progress</h2>
-        <p className="text-gray-500 text-sm mb-6 font-mono">{sessionId}</p>
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl p-8 w-full max-w-lg text-center">
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent mb-2">Research in Progress</h2>
+        <p className="text-zinc-500 text-sm mb-6 font-mono">{sessionId}</p>
 
         {error ? (
-          <p className="text-red-600 bg-red-50 rounded-lg px-4 py-2">{error}</p>
+          <p className="text-red-400 bg-red-950/40 border border-red-800/60 rounded-lg px-4 py-2">{error}</p>
         ) : (
           <>
             {/* Progress bar */}
-            <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden">
+            <div className="w-full bg-zinc-900 border border-zinc-800 rounded-full h-4 mb-4 overflow-hidden">
               <div
-                className="bg-indigo-500 h-4 rounded-full transition-all duration-700"
+                className="bg-emerald-500 h-4 rounded-full transition-all duration-700 shadow-lg shadow-emerald-500/20"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <p className="text-sm text-gray-600 font-semibold mb-1">{progress}% complete</p>
+            <p className="text-sm text-zinc-300 font-semibold mb-1">{progress}% complete</p>
 
             {/* Current agent */}
             {status?.current_agent && (
-              <p className="text-indigo-600 font-medium mb-2">
+              <p className="text-emerald-400 font-medium mb-2">
                 {AGENT_LABELS[status.current_agent] ?? status.current_agent}
               </p>
             )}
 
             {/* Status message */}
-            <p className="text-gray-500 text-sm">
+            <p className="text-zinc-400 text-sm">
               {STATUS_MESSAGES[status?.status] ?? (status?.status ?? 'Initialising…')}
             </p>
 
             {/* Error from server */}
             {status?.error_message && (
-              <p className="mt-4 text-red-600 text-sm bg-red-50 rounded-lg px-4 py-2">
+              <p className="mt-4 text-red-400 text-sm bg-red-950/40 border border-red-800/60 rounded-lg px-4 py-2">
                 {status.error_message}
               </p>
             )}
