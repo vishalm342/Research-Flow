@@ -362,6 +362,18 @@ async def run_research_workflow(
                 session.status = "failed"
                 session.error_message = error_msg
                 await session.save()
+
+            if conversation_id:
+                failed_message = await Message.find_one(
+                    Message.conversation_id == conversation_id,
+                    Message.metadata["research_id"] == session_id,
+                )
+                if failed_message:
+                    metadata = dict(failed_message.metadata or {})
+                    metadata["status"] = "failed"
+                    metadata["error_message"] = error_msg
+                    failed_message.metadata = metadata
+                    await failed_message.save()
         except Exception as db_exc:
             logger.error(
                 f"Failed to persist error for session {session_id}: {db_exc}"
