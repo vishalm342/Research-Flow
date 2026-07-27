@@ -1,4 +1,9 @@
+import asyncio
+
 from openai import AsyncOpenAI
+from openai import RateLimitError
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
 from app.config import settings
 from app.utils.logger import logger
 
@@ -12,6 +17,29 @@ _client = AsyncOpenAI(
     api_key=settings.SAMBANOVA_API_KEY,
     base_url="https://api.sambanova.ai/v1",
 )
+
+_llm_semaphore = asyncio.Semaphore(3)
+
+
+@retry(
+    retry=retry_if_exception_type(RateLimitError),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    stop=stop_after_attempt(5),
+    reraise=True,
+)
+async def _call_with_retry(model: str, prompt: str):
+    async with _llm_semaphore:
+        return await _client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            temperature=0.7,
+            max_tokens=2000,
+        )
 
 
 async def call_llm(prompt: str, model: str = "Meta-Llama-3.3-70B-Instruct") -> str:
@@ -31,17 +59,7 @@ async def call_llm(prompt: str, model: str = "Meta-Llama-3.3-70B-Instruct") -> s
     try:
         logger.info(f"Calling LLM with model: {model}")
 
-        completion = await _client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
-            temperature=0.7,
-            max_tokens=2000,
-        )
+        completion = await _call_with_retry(model, prompt)
 
         response = completion.choices[0].message.content
         logger.info(f"LLM response received: {len(response)} characters")
