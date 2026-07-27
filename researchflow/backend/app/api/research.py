@@ -1,5 +1,5 @@
 # API endpoints for researcher agent interaction
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 import uuid
 from app.schemas.research import ResearchRequest, ResearchResponse, StatusResponse
 from app.models.research import ResearchSession
@@ -112,34 +112,42 @@ from fastapi.responses import StreamingResponse
 import json
 
 @router.get("/status/{session_id}/stream")
-async def stream_research_status(session_id: str):
+async def stream_research_status(session_id: str, request: Request):
     """
     Stream real-time status updates and agent events for a research session.
     """
     async def event_generator():
         last_event_count = 0
         last_status = None
-        while True:
-            session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
-            if not session:
-                yield f"data: {json.dumps({'error': 'Session not found'})}\n\n"
-                break
+        try:
+            while True:
+                if await request.is_disconnected():
+                    logger.info(f"Client disconnected, stopping stream for {session_id}")
+                    break
 
-            current_events = session.agent_events or []
-            if len(current_events) > last_event_count:
-                new_events = current_events[last_event_count:]
-                for event in new_events:
-                    yield f"data: {json.dumps(event)}\n\n"
-                last_event_count = len(current_events)
-            elif session.status != last_status:
-                yield f"data: {json.dumps({'status': session.status, 'progress': session.progress, 'current_agent': session.current_agent})}\n\n"
-                last_status = session.status
-            
-            if session.status in ['completed', 'complete', 'failed']:
-                # Yield one final time to ensure client gets the end state
-                yield f"data: {json.dumps({'status': session.status, 'progress': session.progress, 'report_id': session.report_id})}\n\n"
-                break
+                session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
+                if not session:
+                    yield f"data: {json.dumps({'error': 'Session not found'})}\n\n"
+                    break
 
-            await asyncio.sleep(1)
+                current_events = session.agent_events or []
+                if len(current_events) > last_event_count:
+                    new_events = current_events[last_event_count:]
+                    for event in new_events:
+                        yield f"data: {json.dumps(event)}\n\n"
+                    last_event_count = len(current_events)
+                elif session.status != last_status:
+                    yield f"data: {json.dumps({'status': session.status, 'progress': session.progress, 'current_agent': session.current_agent})}\n\n"
+                    last_status = session.status
+
+                if session.status in ['completed', 'complete', 'failed']:
+                    # Yield one final time to ensure client gets the end state
+                    yield f"data: {json.dumps({'status': session.status, 'progress': session.progress, 'report_id': session.report_id})}\n\n"
+                    break
+
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            logger.info(f"Stream cancelled for {session_id}")
+            raise
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
