@@ -114,6 +114,14 @@ const TerminalLog = ({ sessionId, conversationId, onComplete, onWorkflowComplete
           });
         }
         
+        if (data.status === 'failed') {
+          setLogs(prev => [...prev, '❌ Workflow failed']);
+          setWorkflowDone(true);
+          eventSource.close();
+          setTimeout(() => callbacksRef.current.onComplete?.(), 500);
+          return;
+        }
+        
       } catch (err) {
         console.error('Error parsing SSE data', err);
       }
