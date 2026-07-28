@@ -10,8 +10,11 @@ const ChatMessage = ({ message, onResearchComplete, onWorkflowComplete, onEdit, 
   const metadata = message.metadata || {};
   const [copied, setCopied] = useState(false);
   
+  // Research failed if the workflow marked the session as failed and no report was created
+  const isResearchFailed = metadata.type === 'research_report' && metadata.research_id && metadata.status === 'failed';
+
   // Research is pending if it has research_id but no report yet
-  const isResearchPending = metadata.type === 'research_report' && metadata.research_id && !metadata.report_id;
+  const isResearchPending = metadata.type === 'research_report' && metadata.research_id && !metadata.report_id && !isResearchFailed;
   
   // Report is complete if it has both research_id AND report_id
   const isReportComplete = metadata.type === 'research_report' && metadata.report_id;
@@ -88,6 +91,30 @@ const ChatMessage = ({ message, onResearchComplete, onWorkflowComplete, onEdit, 
             onComplete={onResearchComplete}
             onWorkflowComplete={handleWorkflowComplete}
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (isResearchFailed) {
+    return (
+      <div className="flex justify-start w-full max-w-full overflow-hidden">
+        <div className="w-full max-w-full lg:max-w-3xl">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center flex-shrink-0">
+              <span className="text-[10px] text-zinc-400">✦</span>
+            </div>
+            <span className="text-xs font-medium text-zinc-400">ResearchFlow</span>
+          </div>
+
+          <div className="bg-zinc-900/80 border border-red-500/20 rounded-2xl rounded-tl-sm px-4 py-5 md:px-6 shadow-sm w-full">
+            <div className="flex items-center gap-2 text-red-400 text-sm font-semibold mb-2">
+              <span>Research failed</span>
+            </div>
+            <p className="text-zinc-300 text-sm md:text-base leading-relaxed">
+              {metadata.error_message || 'The research workflow failed before a report could be generated.'}
+            </p>
+          </div>
         </div>
       </div>
     );
