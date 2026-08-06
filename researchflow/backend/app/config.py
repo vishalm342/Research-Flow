@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     )
 
     SAMBANOVA_API_KEY: str
+    LLM_PROVIDER: str = "groq"
+    GROQ_API_KEY: str | None = None
+    LLM_MODEL: str = "llama-3.1-8b-instant"
     TAVILY_API_KEY: str = ""  # optional – falls back to DuckDuckGo when empty
     MONGODB_URL: str
     DATABASE_NAME: str = "researchflow"
