@@ -1,7 +1,7 @@
 import asyncio
+import re
 
-from openai import AsyncOpenAI
-from openai import RateLimitError
+from openai import AsyncOpenAI, RateLimitError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import settings
@@ -9,7 +9,7 @@ from app.utils.logger import logger
 
 
 class LLMError(Exception):
-    """Custom exception for LLM-related errors"""
+    """Custom exception for LLM-related errors."""
     pass
 
 
@@ -19,6 +19,17 @@ _client = AsyncOpenAI(
 )
 
 _llm_semaphore = asyncio.Semaphore(3)
+
+
+def _is_non_retryable_prompt_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return (
+        "request too large" in msg
+        or "tokens per minute" in msg
+        or "rate_limit_exceeded" in msg
+        or "context length" in msg
+        or "prompt too long" in msg
+    )
 
 
 @retry(
@@ -38,23 +49,23 @@ async def _call_with_retry(model: str, prompt: str):
                 }
             ],
             temperature=0.7,
-            max_tokens=2000,
+            max_tokens=1024,
         )
 
 
 async def call_llm(prompt: str, model: str | None = None) -> str:
     """
-    Call SambaNova LLM API asynchronously via the OpenAI-compatible interface.
+    Call the LLM API asynchronously via the OpenAI-compatible Groq interface.
 
     Args:
-        prompt: The prompt to send to the LLM
-        model: The model name to use (default: Meta-Llama-3.3-70B-Instruct)
+        prompt: The prompt to send to the LLM.
+        model: Optional model override. Defaults to configured LLM model.
 
     Returns:
-        The generated text response from the LLM
+        The generated text response from the LLM.
 
     Raises:
-        LLMError: If the API call fails
+        LLMError: If the API call fails.
     """
     try:
         effective_model = model or settings.LLM_MODEL
@@ -62,11 +73,16 @@ async def call_llm(prompt: str, model: str | None = None) -> str:
 
         completion = await _call_with_retry(effective_model, prompt)
 
-        response = completion.choices[0].message.content
+        response = completion.choices[0].message.content or ""
         logger.info(f"LLM response received: {len(response)} characters")
         return response
 
     except Exception as e:
+        if _is_non_retryable_prompt_error(e):
+            error_msg = f"Failed to call LLM API: {str(e)}"
+            logger.error(error_msg)
+            raise LLMError(error_msg) from e
+
         error_msg = f"Failed to call LLM API: {str(e)}"
         logger.error(error_msg)
         raise LLMError(error_msg) from e

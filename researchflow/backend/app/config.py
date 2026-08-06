@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -9,20 +10,27 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    SAMBANOVA_API_KEY: str
+    # LLM provider settings
     LLM_PROVIDER: str = "groq"
     GROQ_API_KEY: str | None = None
     LLM_MODEL: str = "llama-3.1-8b-instant"
-    TAVILY_API_KEY: str = ""  # optional – falls back to DuckDuckGo when empty
+    SAMBANOVA_API_KEY: str | None = None
+
+    # Optional: Tavily API key – used for web search (falls back to DuckDuckGo)
+    TAVILY_API_KEY: str = ""
+
+    # Database
     MONGODB_URL: str
     DATABASE_NAME: str = "researchflow"
+
+    # Server
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
     FRONTEND_URL: str = "http://localhost:5173"
 
 
 @lru_cache()
-def get_settings():
+def get_settings() -> Settings:
     return Settings()
 
 
