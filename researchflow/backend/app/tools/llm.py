@@ -14,8 +14,8 @@ class LLMError(Exception):
 
 
 _client = AsyncOpenAI(
-    api_key=settings.SAMBANOVA_API_KEY,
-    base_url="https://api.sambanova.ai/v1",
+    api_key=settings.GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1",
 )
 
 _llm_semaphore = asyncio.Semaphore(3)
@@ -42,13 +42,13 @@ async def _call_with_retry(model: str, prompt: str):
         )
 
 
-async def call_llm(prompt: str, model: str = "Meta-Llama-3.3-70B-Instruct") -> str:
+async def call_llm(prompt: str, model: str | None = None) -> str:
     """
-    Call SambaNova LLM API asynchronously via the OpenAI-compatible interface.
+    Call LLM API asynchronously via the OpenAI-compatible interface.
 
     Args:
         prompt: The prompt to send to the LLM
-        model: The model name to use (default: Meta-Llama-3.3-70B-Instruct)
+        model: Optional model override. Defaults to configured LLM model.
 
     Returns:
         The generated text response from the LLM
@@ -57,9 +57,10 @@ async def call_llm(prompt: str, model: str = "Meta-Llama-3.3-70B-Instruct") -> s
         LLMError: If the API call fails
     """
     try:
-        logger.info(f"Calling LLM with model: {model}")
+        effective_model = model or settings.LLM_MODEL
+        logger.info(f"Calling LLM with model: {effective_model}")
 
-        completion = await _call_with_retry(model, prompt)
+        completion = await _call_with_retry(effective_model, prompt)
 
         response = completion.choices[0].message.content
         logger.info(f"LLM response received: {len(response)} characters")

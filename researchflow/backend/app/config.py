@@ -9,6 +9,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    LLM_PROVIDER: str = "groq"
+    GROQ_API_KEY: str | None = None
+    LLM_MODEL: str = "llama-3.1-8b-instant"
     SAMBANOVA_API_KEY: str
     TAVILY_API_KEY: str = ""  # optional – falls back to DuckDuckGo when empty
     MONGODB_URL: str
