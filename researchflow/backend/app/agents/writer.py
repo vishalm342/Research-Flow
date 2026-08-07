@@ -10,33 +10,54 @@ from app.models.research import ResearchSession
 from app.utils.logger import logger
 
 
+MAX_SOURCES = 8            # limit number of source docs used in writer prompt
+MAX_SOURCE_CHARS = 1500    # per-source content cap
+MAX_CONTEXT_CHARS = 8000   # global context cap for writer prompt
+
+
 async def writer_node(state: AgentState) -> AgentState:
     """
     Writer agent node - generates a comprehensive research report from scraped content.
-    
-    Note: Status updates are now handled by the workflow orchestration layer
+
+    Note: Status updates are handled by the workflow orchestration layer
     to ensure strict sequential ordering of status events.
     """
     try:
         session_id = state["session_id"]
         topic = state["topic"]
-        scraped_content = state["scraped_content"]
+        scraped_content = state.get("scraped_content", [])
 
         logger.info(f"Writer node started for session {session_id}, topic: {topic}")
 
+        # Build a trimmed context from scraped sources to stay within Groq TPM limits.
         if not scraped_content:
             logger.warning(f"No scraped content available for topic: {topic}")
             context = "No content available."
         else:
             context_parts = []
-            for idx, content in enumerate(scraped_content, 1):
-                source_text = f"\n--- Source {idx}: {content.get('title', 'Untitled')} ---\n"
-                source_text += f"URL: {content.get('url', 'N/A')}\n"
-                source_text += f"{content.get('content', '')}\n"
-                context_parts.append(source_text)
-            context = "\n".join(context_parts)
+            for idx, content in enumerate(scraped_content[:MAX_SOURCES], 1):
+                title = content.get("title", "Untitled")
+                url = content.get("url", "N/A")
+                body = content.get("content", "") or ""
 
-        logger.info(f"Built context from {len(scraped_content)} sources, {len(context)} characters")
+                # Trim each source body to avoid huge prompts
+                body = body[:MAX_SOURCE_CHARS]
+
+                source_text = (
+                    f"\n--- Source {idx}: {title} ---\n"
+                    f"URL: {url}\n"
+                    f"{body}\n"
+                )
+                context_parts.append(source_text)
+
+            context = "\n".join(context_parts)
+            # Global cap on merged context
+            context = context[:MAX_CONTEXT_CHARS]
+
+        logger.info(
+            f"Built trimmed context from {min(len(scraped_content), MAX_SOURCES)} "
+            f"sources, {len(context)} characters"
+        )
 
         agent_notes = format_agent_messages(state)
         memory_notes = format_memory_context(state)
@@ -46,8 +67,10 @@ async def writer_node(state: AgentState) -> AgentState:
         if memory_notes:
             notes_block += f"\n\nMemory:\n{memory_notes}"
 
-        prompt = f"""You are a research analyst. Write a comprehensive report of minimum 1200 words on '{topic}'. Use the following sources:
+        prompt = f"""You are a research analyst. Write a comprehensive report of at least 1200 words on '{topic}'.
+Use the following sources and notes:
 
+Sources:
 {context}
 {notes_block}
 
@@ -69,10 +92,12 @@ Format the report in markdown with the following required sections:
 ## Conclusion
 
 IMPORTANT INSTRUCTIONS:
-- Write a comprehensive report of minimum 1200 words
-- Include an Introduction, Background, Key Findings (at least 5 distinct findings), Detailed Analysis, Implications, and Conclusion section
-- Do not truncate or summarize — write in full depth for each section
-- Cite sources naturally in text using the source URLs provided"""
+- Write a comprehensive report of minimum 1200 words.
+- Include an Introduction, Background, Key Findings (at least 5 distinct findings),
+  Detailed Analysis, Implications, and Conclusion section.
+- Do not truncate or overly summarize — write in full depth for each section.
+- Cite sources naturally in text using the source URLs provided (you can mention them inline).
+"""
 
         logger.info("Calling LLM to generate draft report")
         response = await call_llm(prompt)
@@ -89,6 +114,7 @@ IMPORTANT INSTRUCTIONS:
             f"Drafted report with {word_count} words.",
             {"word_count": word_count},
         )
+
         await append_memory_entry(
             state,
             "writer",
@@ -109,7 +135,9 @@ IMPORTANT INSTRUCTIONS:
         try:
             session_id = state.get("session_id")
             if session_id:
-                session = await ResearchSession.find_one(ResearchSession.session_id == session_id)
+                session = await ResearchSession.find_one(
+                    ResearchSession.session_id == session_id
+                )
                 if session:
                     session.status = "failed"
                     session.error_message = error_msg

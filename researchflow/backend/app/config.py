@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     # LLM provider settings
     LLM_PROVIDER: str = "groq"
     GROQ_API_KEY: str | None = None
+    # Default model: Groq Llama 3.1 8B Instant (free tier, good quality for reports)
     LLM_MODEL: str = "llama-3.1-8b-instant"
+
+    # Optional: SambaNova key retained for future use
     SAMBANOVA_API_KEY: str | None = None
 
     # Optional: Tavily API key – used for web search (falls back to DuckDuckGo)
@@ -23,7 +26,7 @@ class Settings(BaseSettings):
     MONGODB_URL: str
     DATABASE_NAME: str = "researchflow"
 
-    # Server
+    # Server / frontend
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
     FRONTEND_URL: str = "http://localhost:5173"
