@@ -7,9 +7,6 @@ from app.api import research, reports, chat
 app = FastAPI(title="ResearchFlow API", version="1.0.0")
 
 allowed_origins = [settings.FRONTEND_URL] if settings.FRONTEND_URL else ["*"]
-origins = [
-    "http://localhost:5173",
-]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,

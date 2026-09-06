@@ -24,8 +24,8 @@ _llm_semaphore = asyncio.Semaphore(3)
 
 def _is_non_retryable_prompt_error(exc: Exception) -> bool:
     """
-    Detect errors that won't succeed on retry, such as 'request too large'
-    or tokens-per-minute limits. For these we fail fast rather than looping.
+    Detect prompt errors that won't succeed on retry, such as 'request too
+    large' or 'context length'. For these we fail fast rather than looping.
     """
     msg = str(exc).lower()
     return (
@@ -59,6 +59,11 @@ async def _call_with_retry(model: str, prompt: str):
                 max_tokens=512,
             )
         except Exception as exc:
+            # Groq TPM/RPM limit errors are raised as RateLimitError whose
+            # message contains "tokens per minute"/"rate_limit_exceeded" --
+            # let tenacity retry those instead of failing fast.
+            if isinstance(exc, RateLimitError):
+                raise
             if _is_non_retryable_prompt_error(exc):
                 # Prompt/token issue: don't retry, surface directly.
                 raise LLMError(str(exc)) from exc
